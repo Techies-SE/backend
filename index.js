@@ -10,8 +10,11 @@ const adminsRoutes = require('./routes/admins');
 const patientsWDoctors = require('./routes/lab_data-patients-doctors');
 const doctorsWDepartments = require('./routes/doctors-departments');
 const uploadRoutes = require("./routes/upload-csv");
+const authRoute = require("./routes/auth");
+const profileRoute = require("./routes/profile");
 const corse = require('cors');
 const db = require('./db'); // import the database connection
+
 
 require('dotenv').config(); // Load environment variables from .env file
 
@@ -24,7 +27,7 @@ app.use(bodyParser.json());
 
 // Routes
 app.use('/patients', patientsRoutes);
-app.use('/lab_data', labDataRoutes);
+app.use('/lab-data', labDataRoutes);
 app.use('/lab_test_result', labTestResultRoutes);
 app.use('/departments', departmentsRoutes);
 app.use('/doctors', doctorsRoutes);
@@ -33,6 +36,8 @@ app.use('/admins', adminsRoutes);
 app.use('/patients-with-doctors', patientsWDoctors);
 app.use('/doctors-with-departments', doctorsWDepartments);
 app.use("/upload", uploadRoutes);
+app.use("/login", authRoute);
+app.use("/profile", profileRoute);
 
 // Start the server
 app.listen(PORT, () => {

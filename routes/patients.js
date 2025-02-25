@@ -1,23 +1,44 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Make sure to create a db.js file for database connection
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
-// Create a patient
-router.post("/", (req, res) => {
-  const { name, citizen_id, phone_no, email, password, status, doctor_id } =
-    req.body;
-  const query =
-    "INSERT INTO patients (name, citizen_id, phone_no, email, password, status, doctor_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
-  db.query(
-    query,
-    [name, citizen_id, phone_no, email, password, status, doctor_id],
-    (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.status(201).json({ id: results.insertId });
+// create a patient 
+router.post("/", async (req, res) => {
+  const { hn_number, name, citizen_id, phone_no, doctor_id } = req.body;
+
+  // Validate required fields
+  if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id) {
+    return res.status(400).json({ error: "All fields are required." });
+  }
+
+  // Hash the citizen_id to create a password
+  const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
+
+  // Prepare the SQL query
+  const query = `
+    INSERT INTO patients (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  const values = [
+    hn_number,
+    name,
+    citizen_id,
+    phone_no,
+    hashedPassword, // Hashed password
+    false, // lab_data_status default value
+    false, // account_status default value
+    doctor_id
+  ];
+
+  // Execute the query
+  db.query(query, values, (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
     }
-  );
+    res.status(201).json({ id: results.insertId, message: "Patient created successfully." });
+  });
 });
 
 // Get all patients
