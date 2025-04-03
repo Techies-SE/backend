@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Make sure to create a db.js file for database connection
-const bcrypt = require('bcrypt');
+const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
-// create a patient 
+// create a patient
 router.post("/", async (req, res) => {
   const { hn_number, name, citizen_id, phone_no, doctor_id } = req.body;
 
@@ -29,7 +29,7 @@ router.post("/", async (req, res) => {
     hashedPassword, // Hashed password
     false, // lab_data_status default value
     false, // account_status default value
-    doctor_id
+    doctor_id,
   ];
 
   // Execute the query
@@ -37,7 +37,9 @@ router.post("/", async (req, res) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.status(201).json({ id: results.insertId, message: "Patient created successfully." });
+    res
+      .status(201)
+      .json({ id: results.insertId, message: "Patient created successfully." });
   });
 });
 
@@ -101,6 +103,93 @@ router.get("/:id/details", (req, res) => {
     }
   );
 });
+
+// Get a patient with appointments
+router.get("/id=:id/appointments", async (req, res) => {
+  const hnNum = req.params.id;
+  const query = `SELECT a.hn_number,
+    COUNT(a.id) AS total_appointments,
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'appointment_date', a.appointment_date,
+            'appointment_time', a.appointment_time,
+            'specialization', d.specialization,
+            'status', a.status,
+            'doctor', d.name
+        )
+    ) AS appointments
+FROM appointments a
+JOIN doctors d ON a.doctor_id = d.id
+WHERE a.hn_number = ?
+GROUP BY a.hn_number;`;
+  db.query(query, [hnNum], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.length === 0)
+      return res.status(404).json({ message: "No appointments found" });
+    res.json(result[0]);
+  });
+});
+
+// get a patient with lab test and lab test items
+router.get("/id=:id/lab-results", async (req, res) => {
+  const hnNum = req.params.id;
+  const query = `
+    SELECT 
+      lt.hn_number,
+      lt.id AS lab_test_id,
+      lt.lab_test_name,
+      lt.lab_test_date,
+      lti.lab_item_name,
+      lti.lab_item_normal_ref_value,
+      lti.lab_item_value,
+      lti.lab_item_status,
+      lti.lab_item_recommendation
+    FROM lab_tests lt
+    LEFT JOIN lab_test_items lti ON lt.id = lti.lab_test_id
+    WHERE lt.hn_number = ?
+  `;
+
+  db.query(query, [hnNum], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.length === 0)
+      return res.status(404).json({ message: "No Lab Data Found" });
+
+    // Grouping lab tests
+    const response = {
+      hn_number: hnNum,
+      total_lab_test: 0,
+      lab_test: [],
+    };
+
+    const labTestsMap = new Map();
+
+    result.forEach((row) => {
+      if (!labTestsMap.has(row.lab_test_id)) {
+        labTestsMap.set(row.lab_test_id, {
+          name: row.lab_test_name,
+          date: row.lab_test_date,
+          items: [],
+        });
+      }
+
+      if (row.lab_item_name) {
+        labTestsMap.get(row.lab_test_id).items.push({
+          name: row.lab_item_name,
+          normal_reference_value: row.lab_item_normal_ref_value,
+          value: row.lab_item_value,
+          result: row.lab_item_status,
+          recommendation: row.lab_item_recommendation,
+        });
+      }
+    });
+
+    response.lab_test = Array.from(labTestsMap.values());
+    response.total_lab_test = response.lab_test.length;
+
+    res.json(response);
+  });
+});
+
 
 // Update a patient
 router.put("/:id", (req, res) => {

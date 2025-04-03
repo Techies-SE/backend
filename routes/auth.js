@@ -12,10 +12,7 @@ const SECRET_KEY = process.env.JWT_SECRET;
 router.post("/", async (req, res)=>{
 
     const {phone_no, password} = req.body;
-    // same with
-   // const phone_no = req.body.phone_no;
-   // const password = req.body.password;
-
+    
    // (?) place holder for parameter
    // [phone_no] parameter array which will go into the place holder
     db.query("SELECT * FROM patients WHERE phone_no = ?", [phone_no], async (err, results)=>{
@@ -44,7 +41,8 @@ router.post("/", async (req, res)=>{
         const isFirstTimeLogin = patient.account_status === 0;
 
         res.json({ message: "Login successful", token, firstTimeLogin: isFirstTimeLogin, id: patient.id });
-        console.log(patient);
+        console.log('Log In Status: ' + res.statusCode);
+        //console.log(patient);
     })
 });
 

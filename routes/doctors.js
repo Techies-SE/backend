@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-//create a doctor 
+// using
+// create a doctor 
 router.post('/', (req, res)=>{
     const {name, phone_no, email, password, specialization, status, department_id} = req.body;
     const query = 'INSERT INTO doctors (name, phone_no, email, password, specialization, status, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)';
@@ -13,8 +14,8 @@ router.post('/', (req, res)=>{
         res.status(201).json({ id: results.insertId });
     });
 })
-
-//get all doctors
+// using
+// get all doctors
 router.get('/', (req, res) => {
     db.query('SELECT * FROM doctors', (err, results) => {
         if (err) {
@@ -23,6 +24,25 @@ router.get('/', (req, res) => {
         res.json(results);
     });
 });
+
+// will use
+// get doctor by id
+router.get('/id=:id', (req, res) => {
+    const doctorId = req.params.id;
+
+    db.query('SELECT * FROM doctors WHERE id = ?', [doctorId], (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'Doctor not found' });
+        }
+
+        res.json(results[0]);
+    });
+});
+
 
 
 

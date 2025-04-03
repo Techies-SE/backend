@@ -12,6 +12,10 @@ const doctorsWDepartments = require('./routes/doctors-departments');
 const uploadRoutes = require("./routes/upload-csv");
 const authRoute = require("./routes/auth");
 const profileRoute = require("./routes/profile");
+const availableSlotsRoute = require("./routes/available_slots");
+const appointmentRoute = require("./routes/appointments");
+const scheduleRoute = require("./routes/doctor-schedules");
+const approvalRoute = require("./routes/appointment-apporval");
 const corse = require('cors');
 const db = require('./db'); // import the database connection
 
@@ -37,7 +41,13 @@ app.use('/patients-with-doctors', patientsWDoctors);
 app.use('/doctors-with-departments', doctorsWDepartments);
 app.use("/upload", uploadRoutes);
 app.use("/login", authRoute);
+app.use("/slots", availableSlotsRoute);
 app.use("/profile", profileRoute);
+app.use('/appointment', appointmentRoute);
+app.use('/schedule', scheduleRoute);
+app.use('/appointments', approvalRoute);
+
+
 
 // Start the server
 app.listen(PORT, () => {

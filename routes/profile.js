@@ -4,10 +4,9 @@ const db = require("../db");
 const authenticateToken = require("../middlewear/auth");
 
 
-// Protected Route
+// Protected Routes
 router.get("/", authenticateToken, (req, res)=>{
     const userId = req.user.id; // extract userID from token
-
     const patientQuery = `SELECT hn_number, name, citizen_id, phone_no, doctor_id, lab_data_status, account_status FROM patients WHERE id = ?`
     db.query(patientQuery, [userId], (err, patientResults)=>{
         if (err) return res.status(500).json({ error: "Database error" });
@@ -15,7 +14,7 @@ router.get("/", authenticateToken, (req, res)=>{
 
         const patient = patientResults[0];
 
-        const labQuery = `SELECT gender, blood_type, age, date_of_birth, weight, height, bmi, systolic, diastolic, order_date FROM lab_data WHERE hn_number = ? ORDER BY order_date DESC`;
+        const labQuery = `SELECT gender, blood_type, age, date_of_birth, weight, height, bmi, systolic, diastolic, order_date FROM patient_data WHERE hn_number = ? ORDER BY order_date DESC`;
 
         db.query(labQuery, [patient.hn_number], (err, labResults)=>{
             if (err) return res.status(500).json({ error: "Database error" });
@@ -35,7 +34,69 @@ router.get("/", authenticateToken, (req, res)=>{
             })
         })
     })
-
 })
+
+router.get("/id=:id/lab-results", authenticateToken, async (req, res) => {
+    const hnNum = req.params.id; // Extracting hn_number from the URL parameter
+
+    const query = `
+    SELECT 
+        lt.hn_number,
+        lt.id AS lab_test_id,
+        lt.lab_test_name,
+        lt.lab_test_date,
+        lti.lab_item_name,
+        lti.lab_item_normal_ref_value,
+        lti.lab_item_value,
+        lti.unit,
+        lti.lab_item_status,
+        lti.lab_item_recommendation
+    FROM lab_tests lt
+    LEFT JOIN lab_test_items lti ON lt.id = lti.lab_test_id
+    WHERE lt.hn_number = ?
+    `;
+
+    db.query(query, [hnNum], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (result.length === 0) return res.status(404).json({ message: "No Lab Data Found" });
+
+        // Grouping lab tests
+        const response = {
+            hn_number: hnNum,
+            total_lab_test: 0,
+            lab_test: [],
+        };
+
+        const labTestsMap = new Map();
+
+        result.forEach((row) => {
+            if (!labTestsMap.has(row.lab_test_id)) {
+                labTestsMap.set(row.lab_test_id, {
+                    name: row.lab_test_name,
+                    date: row.lab_test_date,
+                    items: [],
+                });
+            }
+
+            if (row.lab_item_name) {
+                labTestsMap.get(row.lab_test_id).items.push({
+                    name: row.lab_item_name,
+                    normal_reference_value: row.lab_item_normal_ref_value,
+                    value: row.lab_item_value,
+                    unit: row.unit || 'N/A',
+                    result: row.lab_item_status,
+                    recommendation: row.lab_item_recommendation,
+                });
+            }
+        });
+
+        response.lab_test = Array.from(labTestsMap.values());
+        response.total_lab_test = response.lab_test.length;
+
+        res.json(response);
+    });
+});
+
+
 
 module.exports = router
