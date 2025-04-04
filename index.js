@@ -16,6 +16,8 @@ const availableSlotsRoute = require("./routes/available_slots");
 const appointmentRoute = require("./routes/appointments");
 const scheduleRoute = require("./routes/doctor-schedules");
 const approvalRoute = require("./routes/appointment-apporval");
+const bulkRoute = require("./routes/bulk-upload");
+const labTestRoute = require("./routes/lab_tests");
 const corse = require('cors');
 const db = require('./db'); // import the database connection
 
@@ -46,6 +48,8 @@ app.use("/profile", profileRoute);
 app.use('/appointment', appointmentRoute);
 app.use('/schedule', scheduleRoute);
 app.use('/appointments', approvalRoute);
+app.use('/bulk', bulkRoute);
+app.use('/lab-tests', labTestRoute);
 
 
 

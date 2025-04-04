@@ -1,47 +1,85 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // Make sure to create a db.js file for database connection
+const db = require("../db"); 
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
-
-// create a patient
+// ***
+// create a patient 
 router.post("/", async (req, res) => {
-  const { hn_number, name, citizen_id, phone_no, doctor_id } = req.body;
+  const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
 
   // Validate required fields
-  if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id) {
+  if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id || !lab_test_master_id) {
     return res.status(400).json({ error: "All fields are required." });
   }
 
-  // Hash the citizen_id to create a password
-  const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
+  try {
+    // Hash the citizen_id to create a password
+    const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
 
-  // Prepare the SQL query
-  const query = `
-    INSERT INTO patients (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    // Start transaction
+    db.beginTransaction((err) => {
+      if (err) return res.status(500).json({ error: err.message });
 
-  const values = [
-    hn_number,
-    name,
-    citizen_id,
-    phone_no,
-    hashedPassword, // Hashed password
-    false, // lab_data_status default value
-    false, // account_status default value
-    doctor_id,
-  ];
+      // Insert into patients table
+      const patientQuery = `
+        INSERT INTO patients (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  // Execute the query
-  db.query(query, values, (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res
-      .status(201)
-      .json({ id: results.insertId, message: "Patient created successfully." });
-  });
+      const patientValues = [
+        hn_number,
+        name,
+        citizen_id,
+        phone_no,
+        hashedPassword,
+        false,
+        false,
+        doctor_id,
+      ];
+
+      db.query(patientQuery, patientValues, (err, results) => {
+        if (err) {
+          return db.rollback(() => {
+            res.status(500).json({ error: err.message });
+          });
+        }
+
+        // Insert into lab_tests table with current timestamp for lab_test_result_date
+        const labTestQuery = `
+          INSERT INTO lab_tests (hn_number, lab_test_master_id, status, lab_test_date)
+          VALUES (?, ?, ?, ?)`;
+
+        const currentTimestamp = new Date(); // or use: new Date().toISOString()
+        const labTestValues = [hn_number, lab_test_master_id, "pending", currentTimestamp];
+
+        db.query(labTestQuery, labTestValues, (err, labResults) => {
+          if (err) {
+            return db.rollback(() => {
+              res.status(500).json({ error: err.message });
+            });
+          }
+
+          // Commit transaction
+          db.commit((err) => {
+            if (err) {
+              return db.rollback(() => {
+                res.status(500).json({ error: err.message });
+              });
+            }
+
+            res.status(201).json({
+              patient_id: results.insertId,
+              message: "Patient and lab test created successfully.",
+            });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
+
 
 // Get all patients
 router.get("/", (req, res) => {
