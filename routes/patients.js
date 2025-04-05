@@ -82,13 +82,24 @@ router.post("/", async (req, res) => {
 
 
 // Get all patients
-router.get("/", (req, res) => {
-  db.query("SELECT * FROM patients", (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(results);
-  });
+// router.get("/", (req, res) => {
+//   db.query("SELECT * FROM patients", (err, results) => {
+//     if (err) {
+//       return res.status(500).json({ error: err.message });
+//     }
+//     res.json(results);
+//   });
+// });
+
+//fixed
+// Get all patients
+router.get("/", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM patients");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get a patient by ID

@@ -1,306 +1,287 @@
-// // routes/labResults.js
-// const express = require("express");
-// const router = express.Router();
-// const multer = require("multer");
-// const pool = require("../db"); // Import your database connection
-// const { spawn } = require("child_process");
-// const csv = require("csv-parser");
-// const fs = require("fs");
-// const path = require("path"); 
-// const upload = require("../middlewear/upload");
-
-// const pythonScriptPath = path.join(__dirname, "../rule-based/script.py"); 
-
-
-// function runPythonProcess(scriptPath, inputObject) {
-//   return new Promise((resolve, reject) => {
-//     const args = Object.entries(inputObject).map(([key, val]) => `--${key}=${val}`);
-//     const python = spawn("python3", [scriptPath, ...args]);
-
-//     let output = "";
-//     python.stdout.on("data", (data) => (output += data.toString()));
-//     python.stderr.on("data", (data) => console.error("Python stderr:", data.toString()));
-
-//     python.on("close", () => {
-//       try {
-//         resolve(JSON.parse(output));
-//       } catch (err) {
-//         reject(`Invalid JSON from Python: ${output}`);
-//       }
-//     });
-//   });
-// }
-
-// router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
-//   if (!req.file) return res.status(400).json({ message: "CSV file is required." });
-
-//   const results = [];
-//   const insertedLabTests = new Set();
-
-//   try {
-//     await pool.execute("START TRANSACTION");
-
-//     fs.createReadStream(req.file.path)
-//       .pipe(csv())
-//       .on("data", (data) => results.push(data))
-//       .on("end", async () => {
-//         try {
-//           for (const row of results) {
-//             const hnNumber = row.hn_number;
-//             const labItemName = row.lab_item_name;
-//             const labItemValue = parseFloat(row.lab_item_value);
-
-//             const [itemRows] = await pool.execute(
-//               "SELECT id FROM lab_test_items WHERE name = ?",
-//               [labItemName]
-//             );
-//             if (itemRows.length === 0) {
-//               console.warn(`❌ Unknown lab item: ${labItemName}. Skipping...`);
-//               continue;
-//             }
-//             const labItemId = itemRows[0].id;
-
-//             const [testRows] = await pool.execute(
-//               `SELECT id, lab_test_master_id FROM lab_tests
-//                WHERE hn_number = ? AND status = 'pending'
-//                ORDER BY lab_test_date DESC LIMIT 1`,
-//               [hnNumber]
-//             );
-//             if (testRows.length === 0) {
-//               console.warn(`⚠️ No active lab test for ${hnNumber}. Skipping...`);
-//               continue;
-//             }
-
-//             const labTestId = testRows[0].id;
-//             insertedLabTests.add(`${labTestId}|${testRows[0].lab_test_master_id}`);
-
-//             await pool.execute(
-//               `INSERT INTO lab_results (lab_test_id, lab_item_id, lab_item_value)
-//                VALUES (?, ?, ?)`,
-//               [labTestId, labItemId, labItemValue]
-//             );
-//           }
-
-//           // ✅ Process each lab test group
-//           for (const labTestEntry of insertedLabTests) {
-//             const [labTestId, labTestMasterId] = labTestEntry.split("|").map(Number);
-
-//             const [requiredItems] = await pool.execute(
-//               "SELECT id, name FROM lab_test_items WHERE lab_test_master_id = ?",
-//               [labTestMasterId]
-//             );
-
-//             const [uploadedItems] = await pool.execute(
-//               "SELECT lab_item_id, lab_item_value FROM lab_results WHERE lab_test_id = ?",
-//               [labTestId]
-//             );
-
-//             if (requiredItems.length !== uploadedItems.length) {
-//               console.log(`⏳ Lab test ${labTestId} incomplete. Still pending.`);
-//               continue;
-//             }
-
-//             const inputForPython = {};
-//             for (const item of requiredItems) {
-//               const match = uploadedItems.find((u) => u.lab_item_id === item.id);
-//               if (match) inputForPython[item.name] = match.lab_item_value;
-//             }
-
-//             const statuses = await runPythonProcess(pythonScriptPath, inputForPython);
-
-//             for (const item of requiredItems) {
-//               await pool.execute(
-//                 `UPDATE lab_results SET lab_item_status = ?
-//                  WHERE lab_test_id = ? AND lab_item_id = ?`,
-//                 [statuses[item.name] || "unknown", labTestId, item.id]
-//               );
-//             }
-
-//             await pool.execute(
-//               "UPDATE lab_tests SET status = 'completed' WHERE id = ?",
-//               [labTestId]
-//             );
-//           }
-
-//           await pool.execute("COMMIT");
-//           fs.unlinkSync(req.file.path);
-//           res.status(200).json({ message: "Lab results uploaded and processed successfully." });
-//         } catch (error) {
-//           await pool.execute("ROLLBACK");
-//           console.error("❌ Error processing lab results:", error);
-//           res.status(500).json({ message: "Error processing lab results." });
-//         }
-//       })
-//       .on("error", async (err) => {
-//         await pool.execute("ROLLBACK");
-//         console.error("❌ Error reading CSV:", err);
-//         res.status(500).json({ message: "Error reading CSV." });
-//       });
-//   } catch (err) {
-//     console.error("❌ DB error:", err);
-//     res.status(500).json({ message: "Database error." });
-//   }
-// });
-
-
-// module.exports = router;
-// routes/labResults.js
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const pool = require("../db"); // Import your database connection
+const pool = require("../db");
 const { spawn } = require("child_process");
 const csv = require("csv-parser");
 const fs = require("fs");
-const path = require("path"); 
-const upload = require("../middlewear/upload");
+const path = require("path");
+const upload = require("../middlewear/upload"); // Fix the typo from "middlewear" to "middlewares"
 
-const pythonScriptPath = path.join(__dirname, "../rule-based/script.py"); 
+const pythonScriptPath = path.join(__dirname, "../rule-based/script.py");
 
-function runPythonProcess(scriptPath, inputObject) {
+
+// Define runPythonProcess properly
+async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
   return new Promise((resolve, reject) => {
-    const args = Object.entries(inputObject).map(([key, val]) => `--${key}=${val}`);
-    const python = spawn("python3", [scriptPath, ...args]);
-
-    let output = "";
-    python.stdout.on("data", (data) => (output += data.toString()));
-    python.stderr.on("data", (data) => console.error("Python stderr:", data.toString()));
-
-    python.on("close", () => {
+    // Convert the input data to JSON
+    const jsonInput = JSON.stringify(inputForPython);
+    
+    // Run Python with the correct arguments
+    const pythonProcess = spawn('python', [
+      scriptPath,
+      labTestMasterId.toString(), // Convert number to string
+      jsonInput
+    ]);
+    
+    let resultData = '';
+    let errorData = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      resultData += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      console.error(`Python stderr: ${data}`);
+      errorData += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`Python process exited with code ${code}`);
+        reject(new Error(`Python error: ${errorData}`));
+        return;
+      }
+      
       try {
-        resolve(JSON.parse(output));
-      } catch (err) {
-        reject(`Invalid JSON from Python: ${output}`);
+        const result = JSON.parse(resultData);
+        resolve(result);
+      } catch (error) {
+        console.error(`Invalid JSON from Python: ${resultData}`);
+        reject(new Error(`Invalid JSON from Python: ${resultData}`));
       }
     });
   });
 }
 
+// Route to upload lab results
 router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "CSV file is required." });
+  if (!req.file)
+    return res.status(400).json({ message: "CSV file is required." });
 
   const results = [];
   const insertedLabTests = new Set();
+  let connection;
 
   try {
-    // Get a connection for transaction
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // Parse CSV
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(req.file.path)
+        .pipe(csv())
+        .on("data", (data) => results.push(data))
+        .on("end", resolve)
+        .on("error", reject);
+    });
+
     
-    try {
-      // Start transaction
-      await connection.beginTransaction();
-      
-      // Read and process the CSV file
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(req.file.path)
-          .pipe(csv())
-          .on("data", (data) => {
-            results.push(data);
-          })
-          .on("end", resolve)
-          .on("error", reject);
-      });
-      
-      // Process each row from the CSV
-      for (const row of results) {
-        const hnNumber = row.hn_number;
-        const labItemName = row.lab_item_name;
-        const labItemValue = parseFloat(row.lab_item_value);
 
-        if (!hnNumber || !labItemName || isNaN(labItemValue)) {
-          console.warn(`❌ Invalid row data: ${JSON.stringify(row)}. Skipping...`);
-          continue;
-        }
 
-        const [itemRows] = await connection.execute(
-          "SELECT id FROM lab_test_items WHERE name = ?",
-          [labItemName]
+    for (const row of results) {
+      const hnNumber = row.hn_number; // Patient's HN number
+      const labItemName = row.lab_item_name; // Lab item name
+      const labItemValue = parseFloat(row.lab_item_value); // Lab item value as a float
+      console.log(`🔍 Processing lab item: "${labItemName}"`);
+
+     
+
+      // Validate the input data
+      if (!hnNumber || !labItemName || isNaN(labItemValue)) {
+        console.warn(
+          `❌ Invalid row data: ${JSON.stringify(row)}. Skipping...`
         );
-        
-        if (itemRows.length === 0) {
-          console.warn(`❌ Unknown lab item: ${labItemName}. Skipping...`);
-          continue;
-        }
-        const labItemId = itemRows[0].id;
-
-        const [testRows] = await connection.execute(
-          `SELECT id, lab_test_master_id FROM lab_tests
-           WHERE hn_number = ? AND status = 'pending'
-           ORDER BY lab_test_date DESC LIMIT 1`,
-          [hnNumber]
-        );
-        
-        if (testRows.length === 0) {
-          console.warn(`⚠️ No active lab test for ${hnNumber}. Skipping...`);
-          continue;
-        }
-
-        const labTestId = testRows[0].id;
-        insertedLabTests.add(`${labTestId}|${testRows[0].lab_test_master_id}`);
-
-        await connection.execute(
-          `INSERT INTO lab_results (lab_test_id, lab_item_id, lab_item_value)
-           VALUES (?, ?, ?)`,
-          [labTestId, labItemId, labItemValue]
-        );
+        continue; // Skip invalid rows
       }
 
-      // Process each lab test group
-      for (const labTestEntry of insertedLabTests) {
-        const [labTestId, labTestMasterId] = labTestEntry.split("|").map(Number);
+      // Look up lab_item_id based on lab_item_name
+      const [itemRows] = await connection.execute(
+        "SELECT id FROM lab_items WHERE lab_item_name = ?",
+        [labItemName]
+      );
+      console.log(`📦 Query result for "${labItemName}":`, itemRows);
 
-        const [requiredItems] = await connection.execute(
-          "SELECT id, name FROM lab_test_items WHERE lab_test_master_id = ?",
-          [labTestMasterId]
-        );
-
-        const [uploadedItems] = await connection.execute(
-          "SELECT lab_item_id, lab_item_value FROM lab_results WHERE lab_test_id = ?",
-          [labTestId]
-        );
-
-        if (requiredItems.length !== uploadedItems.length) {
-          console.log(`⏳ Lab test ${labTestId} incomplete. Still pending.`);
-          continue;
-        }
-
-        const inputForPython = {};
-        for (const item of requiredItems) {
-          const match = uploadedItems.find((u) => u.lab_item_id === item.id);
-          if (match) inputForPython[item.name] = match.lab_item_value;
-        }
-
-        const statuses = await runPythonProcess(pythonScriptPath, inputForPython);
-
-        for (const item of requiredItems) {
-          await connection.execute(
-            `UPDATE lab_results SET lab_item_status = ?
-             WHERE lab_test_id = ? AND lab_item_id = ?`,
-            [statuses[item.name] || "unknown", labTestId, item.id]
-          );
-        }
-
-        await connection.execute(
-          "UPDATE lab_tests SET status = 'completed' WHERE id = ?",
-          [labTestId]
-        );
+      // Check if the lab item exists
+      if (itemRows.length === 0) {
+        console.warn(`❌ Unknown lab item: ${labItemName}. Skipping...`);
+        continue; // Skip unknown lab items
       }
 
-      // Commit transaction and clean up
-      await connection.commit();
-      connection.release();
-      fs.unlinkSync(req.file.path);
-      res.status(200).json({ message: "Lab results uploaded and processed successfully." });
-    } catch (error) {
-      // Rollback on error
-      await connection.rollback();
-      connection.release();
-      console.error("❌ Error processing lab results:", error);
-      res.status(500).json({ message: "Error processing lab results." });
+      const labItemId = itemRows[0].id; // Get the corresponding lab_item_id
+
+      // Look up the lab_test_master_id using the lab_item_id
+      const [testItemRows] = await connection.execute(
+        "SELECT lab_test_master_id FROM lab_test_items WHERE lab_item_id = ?",
+        [labItemId]
+      );
+
+      // Check if the lab_test_master_id exists
+      if (testItemRows.length === 0) {
+        console.warn(
+          `❌ No associated lab test found for lab item ID: ${labItemId}. Skipping...`
+        );
+        continue; // Skip if no associated lab test
+      }
+
+      const labTestMasterId = testItemRows[0].lab_test_master_id; // Get the lab_test_master_id
+      console.log("labMasterId" + labTestMasterId);
+
+      // Find the latest pending lab test for the patient with the associated lab_test_master_id
+      const [testRows] = await connection.execute(
+        `SELECT id FROM lab_tests
+         WHERE hn_number = ? AND lab_test_master_id = ? AND status = 'pending'
+         ORDER BY lab_test_date DESC LIMIT 1`,
+        [hnNumber, labTestMasterId]
+      );
+
+      // Check if there is an active lab test
+      if (testRows.length === 0) {
+        console.warn(
+          `⚠️ No active lab test for ${hnNumber} with master ID ${labTestMasterId}. Skipping...`
+        );
+        continue; // Skip if no active test found
+      }
+
+      const labTestId = testRows[0].id; // Get the lab test ID
+      insertedLabTests.add(`${labTestId}|${labTestMasterId}`); // Track inserted lab test
+      console.log("labItemId" + labItemId);
+
+      // Check if the lab_item_id is associated with the lab_test_id
+      const [labTestItemRows] = await connection.execute(
+        "SELECT lab_item_id FROM lab_test_items WHERE lab_test_master_id = ? AND lab_item_id = ?",
+        [labTestMasterId, labItemId]
+      );
+
+      if (labTestItemRows.length === 0) {
+        console.warn(
+          `❌ Lab item ${labItemName} is not associated with lab_test_master_id ${labTestMasterId}. Skipping...`
+        );
+        continue;
+      }
+
+      // Insert the lab result into the database
+      await connection.execute(
+        `INSERT INTO lab_results (lab_test_id, lab_item_id, lab_item_value)
+         VALUES (?, ?, ?)`,
+        [labTestId, labItemId, labItemValue]
+      );
     }
-  } catch (err) {
-    console.error("❌ DB error:", err);
-    res.status(500).json({ message: "Database error." });
+
+    // Loop through lab test groups
+    for (const entry of insertedLabTests) {
+      const [labTestId, labTestMasterId] = entry.split("|").map(Number);
+
+      // Get required items
+      const [requiredItems] = await connection.execute(
+        "SELECT lab_item_id FROM lab_test_items WHERE lab_test_master_id = ?",
+        [labTestMasterId]
+      );
+
+      const [uploadedItems] = await connection.execute(
+        `SELECT lr.lab_item_id, li.lab_item_name, lr.lab_item_value
+         FROM lab_results lr
+         JOIN lab_items li ON lr.lab_item_id = li.id
+         JOIN lab_test_items lti ON lr.lab_item_id = lti.lab_item_id
+         WHERE lr.lab_test_id = ? AND lti.lab_test_master_id = ?`,
+        [labTestId, labTestMasterId]
+      );
+
+      console.log(`✅ Required count: ${requiredItems.length}`);
+      console.log(`✅ Uploaded count: ${uploadedItems.length}`);
+      console.log(
+        "🧾 Required item IDs:",
+        requiredItems.map((r) => r.lab_item_id)
+      );
+      console.log(
+        "📄 Uploaded item IDs:",
+        uploadedItems.map((u) => u.lab_item_id)
+      );
+      if (requiredItems.length !== uploadedItems.length) {
+        console.log(`⏳ Lab test ${labTestId} incomplete. Still pending.`);
+        continue;
+      }
+
+      // Prepare input for Python
+      const inputForPython = {};
+      for (const item of requiredItems) {
+        const matched = uploadedItems.find(
+          (u) => u.lab_item_id === item.lab_item_id
+        );
+        if (matched) {
+          inputForPython[matched.lab_item_name] = matched.lab_item_value;
+        }
+      }
+
+     
+      const statuses = await runPythonProcess(pythonScriptPath, labTestMasterId, inputForPython);
+
+      console.log("Python returned statuses:", statuses);
+
+
+
+      // Update statuses
+      // for (const item of requiredItems) {
+      //   const matched = uploadedItems.find(
+      //     (u) => u.lab_item_id === item.lab_item_id
+      //   );
+      //   if (!matched) continue;
+      //   const status = statuses[matched.lab_item_name] || "unknown";
+
+      //   await connection.execute(
+      //     `UPDATE lab_results SET lab_item_status = ? 
+      //      WHERE lab_test_id = ? AND lab_item_id = ?`,
+      //     [status, labTestId, matched.lab_item_id]
+      //   );
+      // }
+      for (const item of requiredItems) {
+        const matched = uploadedItems.find(
+          (u) => u.lab_item_id === item.lab_item_id
+        );
+        if (!matched) continue;
+        
+        // Convert lab_item_name to lowercase to match Python response keys
+        const itemNameLower = matched.lab_item_name.toLowerCase();
+        
+        // Extract the classification from the nested structure
+        const status = statuses[itemNameLower]?.classification || "unknown";
+      
+        await connection.execute(
+          `UPDATE lab_results SET lab_item_status = ? 
+           WHERE lab_test_id = ? AND lab_item_id = ?`,
+          [status, labTestId, matched.lab_item_id]
+        );
+      }
+
+      // Mark test as completed
+      await connection.execute(
+        "UPDATE lab_tests SET status = 'completed' WHERE id = ?",
+        [labTestId]
+      );
+
+      // Update patient lab_data_status = true
+      await connection.execute(
+        `UPDATE patients SET lab_data_status = true 
+         WHERE hn_number = (
+            SELECT hn_number FROM lab_tests WHERE id = ?
+         )`,
+        [labTestId]
+      );
+    }
+
+    await connection.commit();
+    res
+      .status(200)
+      .json({ message: "Lab results uploaded and processed successfully." });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error("❌ Error processing lab results:", error);
+    res.status(500).json({ message: "Error processing lab results." });
+  } finally {
+    if (connection) connection.release();
+    fs.unlink(req.file.path, (err) => {
+      if (err) console.error("Error deleting temp file:", err);
+    });
   }
 });
 
