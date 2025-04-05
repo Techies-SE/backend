@@ -10,39 +10,38 @@ const upload = require("../middlewear/upload"); // Fix the typo from "middlewear
 
 const pythonScriptPath = path.join(__dirname, "../rule-based/script.py");
 
-
 // Define runPythonProcess properly
 async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
   return new Promise((resolve, reject) => {
     // Convert the input data to JSON
     const jsonInput = JSON.stringify(inputForPython);
-    
+
     // Run Python with the correct arguments
-    const pythonProcess = spawn('python', [
+    const pythonProcess = spawn("python", [
       scriptPath,
       labTestMasterId.toString(), // Convert number to string
-      jsonInput
+      jsonInput,
     ]);
-    
-    let resultData = '';
-    let errorData = '';
-    
-    pythonProcess.stdout.on('data', (data) => {
+
+    let resultData = "";
+    let errorData = "";
+
+    pythonProcess.stdout.on("data", (data) => {
       resultData += data.toString();
     });
-    
-    pythonProcess.stderr.on('data', (data) => {
+
+    pythonProcess.stderr.on("data", (data) => {
       console.error(`Python stderr: ${data}`);
       errorData += data.toString();
     });
-    
-    pythonProcess.on('close', (code) => {
+
+    pythonProcess.on("close", (code) => {
       if (code !== 0) {
         console.error(`Python process exited with code ${code}`);
         reject(new Error(`Python error: ${errorData}`));
         return;
       }
-      
+
       try {
         const result = JSON.parse(resultData);
         resolve(result);
@@ -76,23 +75,34 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
         .on("error", reject);
     });
 
-    
-
-
     for (const row of results) {
       const hnNumber = row.hn_number; // Patient's HN number
       const labItemName = row.lab_item_name; // Lab item name
-      const labItemValue = parseFloat(row.lab_item_value); // Lab item value as a float
+      let labItemValue = row.lab_item_value; // Lab item value as string initially
       console.log(`🔍 Processing lab item: "${labItemName}"`);
 
-     
+      // Special handling for Gender values
+      if (labItemName === "Gender") {
+        // Convert gender to numeric value (M=0, F=1)
+        if (labItemValue === "M" || labItemValue === "m") {
+          labItemValue = 0;
+        } else if (labItemValue === "F" || labItemValue === "f") {
+          labItemValue = 1;
+        } else {
+          console.warn(`❌ Invalid gender value: ${labItemValue}. Skipping...`);
+          continue; // Skip invalid gender values
+        }
+      } else {
+        // For non-gender fields, parse as float
+        labItemValue = parseFloat(labItemValue);
 
-      // Validate the input data
-      if (!hnNumber || !labItemName || isNaN(labItemValue)) {
-        console.warn(
-          `❌ Invalid row data: ${JSON.stringify(row)}. Skipping...`
-        );
-        continue; // Skip invalid rows
+        // Validate the input data
+        if (!hnNumber || !labItemName || isNaN(labItemValue)) {
+          console.warn(
+            `❌ Invalid row data: ${JSON.stringify(row)}. Skipping...`
+          );
+          continue; // Skip invalid rows
+        }
       }
 
       // Look up lab_item_id based on lab_item_name
@@ -168,7 +178,7 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
       );
     }
 
-    // Loop through lab test groups
+    // The rest of your code remains the same
     for (const entry of insertedLabTests) {
       const [labTestId, labTestMasterId] = entry.split("|").map(Number);
 
@@ -197,55 +207,51 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
         "📄 Uploaded item IDs:",
         uploadedItems.map((u) => u.lab_item_id)
       );
+
       if (requiredItems.length !== uploadedItems.length) {
         console.log(`⏳ Lab test ${labTestId} incomplete. Still pending.`);
         continue;
       }
 
-      // Prepare input for Python
+      // Prepare input for Python - special handling for Gender values
       const inputForPython = {};
-      for (const item of requiredItems) {
-        const matched = uploadedItems.find(
-          (u) => u.lab_item_id === item.lab_item_id
-        );
-        if (matched) {
-          inputForPython[matched.lab_item_name] = matched.lab_item_value;
+      for (const item of uploadedItems) {
+        if (item.lab_item_name === "Gender") {
+          // Convert back to M/F for Python if needed
+          inputForPython[item.lab_item_name] =
+            item.lab_item_value == 0 ? "M" : "F";
+        } else {
+          // For other items, use the value as is (it's already numeric)
+          inputForPython[item.lab_item_name] = parseFloat(item.lab_item_value);
         }
       }
 
-     
-      const statuses = await runPythonProcess(pythonScriptPath, labTestMasterId, inputForPython);
+      const statuses = await runPythonProcess(
+        pythonScriptPath,
+        labTestMasterId,
+        inputForPython
+      );
 
       console.log("Python returned statuses:", statuses);
 
-
-
-      // Update statuses
-      // for (const item of requiredItems) {
-      //   const matched = uploadedItems.find(
-      //     (u) => u.lab_item_id === item.lab_item_id
-      //   );
-      //   if (!matched) continue;
-      //   const status = statuses[matched.lab_item_name] || "unknown";
-
-      //   await connection.execute(
-      //     `UPDATE lab_results SET lab_item_status = ? 
-      //      WHERE lab_test_id = ? AND lab_item_id = ?`,
-      //     [status, labTestId, matched.lab_item_id]
-      //   );
-      // }
       for (const item of requiredItems) {
         const matched = uploadedItems.find(
           (u) => u.lab_item_id === item.lab_item_id
         );
         if (!matched) continue;
-        
+
         // Convert lab_item_name to lowercase to match Python response keys
         const itemNameLower = matched.lab_item_name.toLowerCase();
-        
+
         // Extract the classification from the nested structure
-        const status = statuses[itemNameLower]?.classification || "unknown";
-      
+        //const status = statuses[itemNameLower]?.classification || "unknown";
+        const matchingKey = Object.keys(statuses).find(
+          (key) => key.toLowerCase() === itemNameLower
+        );
+        const status = matchingKey
+          ? statuses[matchingKey].classification
+          : "unknown";
+
         await connection.execute(
           `UPDATE lab_results SET lab_item_status = ? 
            WHERE lab_test_id = ? AND lab_item_id = ?`,
