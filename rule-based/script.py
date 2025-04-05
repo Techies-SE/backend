@@ -107,23 +107,96 @@ def evaluate_liver_function(total_protein, globulin, albumin, ast, alt, alp, tot
 
 # Define a function to evaluate uric acid levels
 def evaluate_uric_acid(uric_acid, gender):
-    result = {}
+    results = {}
     if gender == 'M':
         if uric_acid > 7:
-            result['classification'] = "high"
-            result['recommendation'] = "Consult a doctor."
+            results['uric_acid'] = {"classification": "high", "recommendation": "Consult a doctor"}
+            # result['classification'] = "high"
+            # result['recommendation'] = "Consult a doctor."
         else:
-            result['classification'] = "normal"
-            result['recommendation'] = None
+            results['uric_acid'] = {"classification": "normal", "recommendation": None}
+            # result['classification'] = "normal"
+            # result['recommendation'] = None
     elif gender == 'F':
         if uric_acid > 6:
-            result['classification'] = "high"
-            result['recommendation'] = "Consult a doctor."
+            results['uric_acid'] = {"classification": "high", "recommendation": "Consult a doctor"}
+            # result['classification'] = "high"
+            # result['recommendation'] = "Consult a doctor."
         else:
-            result['classification'] = "normal"
-            result['recommendation'] = None
+            results['uric_acid'] = {"classification": "normal", "recommendation": None}
+            # result['classification'] = "normal"
+            # result['recommendation'] = None
 
-    return result
+    return results
+
+# # Define a function to evaluate complete blood count (CBC)
+# def evaluate_cbc(hct, mcv, wbc, neutrophile, eosinophile, monocyte, plt_count, gender):
+#     results = {}
+
+#     # Evaluate HCT
+#     if gender == 'M':
+#         if 42 <= hct <= 54:
+#             results['HCT'] = ("ปกติ", None)
+#         elif 33 <= hct < 42:
+#             results['HCT'] = ("เม็ดเลือดจางเล็กน้อย", "แนะนำตรวจเพิ่มเติม")
+#         elif 27 <= hct < 33:
+#             results['HCT'] = ("เม็ดเลือดจางปานกลาง", "ควรปรึกษาแพทย์")
+#         elif hct < 27:
+#             results['HCT'] = ("เม็ดเลือดจางรุนแรง", "ควรปรึกษาแพทย์โดยด่วน")
+#     elif gender == 'F':
+#         if 36 <= hct <= 48:
+#             results['HCT'] = ("ปกติ", None)
+#         elif 33 <= hct < 36:
+#             results['HCT'] = ("เม็ดเลือดจางเล็กน้อย", "แนะนำตรวจเพิ่มเติม")
+#         elif 27 <= hct < 33:
+#             results['HCT'] = ("เม็ดเลือดจางปานกลาง", "ควรปรึกษาแพทย์")
+#         elif hct < 27:
+#             results['HCT'] = ("เม็ดเลือดจางรุนแรง", "ควรปรึกษาแพทย์โดยด่วน")
+
+#     # Evaluate MCV
+#     if mcv < 80:
+#         results['MCV'] = ("เม็ดเลือดแดงมีขนาดเล็ก", "อาจเกิดจากขาดธาตุเหล็ก หรือเป็นพาหะธาลัสซีเมีย")
+#     elif 80 <= mcv <= 100:
+#         results['MCV'] = ("ปกติ", None)
+#     elif mcv > 100:
+#         results['MCV'] = ("เม็ดเลือดแดงมีขนาดใหญ่", "อาจเกิดจากขาดโฟเลต หรือวิตามินบี 12 หรือโรคเลือดบางชนิด")
+
+#     # Evaluate WBC
+#     if 6_000 <= wbc <= 10_000:
+#         results['WBC'] = ("ปกติ", None)
+#     elif wbc < 6_000:
+#         neutro_count = wbc * neutrophile / 100
+#         if neutro_count < 1000:
+#             results['WBC'] = ("เม็ดเลือดขาวต่ำอันตราย", "ควรปรึกษาแพทย์ ระวังการติดเชื้อ หลีกเลี่ยงอาหารดิบ")
+#         else:
+#             results['WBC'] = ("เม็ดเลือดขาวต่ำ", None)
+#     elif 10_000 < wbc <= 20_000:
+#         results['WBC'] = ("เม็ดเลือดขาวสูง", "อาจเกิดจากการติดเชื้อ หากมีไข้สูงหรือไข้เรื้อรัง ควรปรึกษาแพทย์")
+#     elif wbc > 20_000:
+#         results['WBC'] = ("เม็ดเลือดขาวสูงมาก", "ควรปรึกษาแพทย์โดยด่วน")
+
+#     # Evaluate EOSINOPHILE
+#     eos_count = wbc * eosinophile / 100
+#     if eos_count > 500:
+#         results['EOSINOPHILE'] = ("เม็ดเลือดขาว EOSINOPHILE สูง", "อาจเกิดจากภูมิแพ้ หอบหืด หรือพยาธิ")
+
+#     # Evaluate MONOCYTE
+#     if 2 <= monocyte <= 6:
+#         results['MONOCYTE'] = ("ปกติ", None)
+#     elif monocyte > 6:
+#         results['MONOCYTE'] = ("MONOCYTE สูง", "มักพบหลังติดเชื้อเกิน 2 สัปดาห์ หรือหลังฉีดวัคซีน")
+
+#     # Evaluate Platelets
+#     if plt_count < 100_000:
+#         results['PLT'] = ("เกล็ดเลือดต่ำ", "ควรระวังอาการเลือดออกผิดปกติ และควรพบแพทย์")
+#     elif 100_000 <= plt_count <= 450_000:
+#         results['PLT'] = ("ปกติ", None)
+#     elif 450_000 < plt_count <= 600_000:
+#         results['PLT'] = ("เกล็ดเลือดสูง", "อาจพบในพาหะธาลัสซีเมีย หรือมีอาการไข้เรื้อรัง ควรปรึกษาแพทย์")
+#     elif plt_count > 600_000:
+#         results['PLT'] = ("เกล็ดเลือดสูงมาก", "ควรปรึกษาแพทย์เพื่อหาสาเหตุ")
+
+#     return results
 
 # Define a function to evaluate complete blood count (CBC)
 def evaluate_cbc(hct, mcv, wbc, neutrophile, eosinophile, monocyte, plt_count, gender):
@@ -132,65 +205,65 @@ def evaluate_cbc(hct, mcv, wbc, neutrophile, eosinophile, monocyte, plt_count, g
     # Evaluate HCT
     if gender == 'M':
         if 42 <= hct <= 54:
-            results['HCT'] = ("ปกติ", None)
+            results['HCT'] = {"classification": "ปกติ", "recommendation": None}
         elif 33 <= hct < 42:
-            results['HCT'] = ("เม็ดเลือดจางเล็กน้อย", "แนะนำตรวจเพิ่มเติม")
+            results['HCT'] = {"classification": "เม็ดเลือดจางเล็กน้อย", "recommendation": "แนะนำตรวจเพิ่มเติม"}
         elif 27 <= hct < 33:
-            results['HCT'] = ("เม็ดเลือดจางปานกลาง", "ควรปรึกษาแพทย์")
+            results['HCT'] = {"classification": "เม็ดเลือดจางปานกลาง", "recommendation": "ควรปรึกษาแพทย์"}
         elif hct < 27:
-            results['HCT'] = ("เม็ดเลือดจางรุนแรง", "ควรปรึกษาแพทย์โดยด่วน")
+            results['HCT'] = {"classification": "เม็ดเลือดจางรุนแรง", "recommendation": "ควรปรึกษาแพทย์โดยด่วน"}
     elif gender == 'F':
         if 36 <= hct <= 48:
-            results['HCT'] = ("ปกติ", None)
+            results['HCT'] = {"classification": "ปกติ", "recommendation": None}
         elif 33 <= hct < 36:
-            results['HCT'] = ("เม็ดเลือดจางเล็กน้อย", "แนะนำตรวจเพิ่มเติม")
+            results['HCT'] = {"classification": "เม็ดเลือดจางเล็กน้อย", "recommendation": "แนะนำตรวจเพิ่มเติม"}
         elif 27 <= hct < 33:
-            results['HCT'] = ("เม็ดเลือดจางปานกลาง", "ควรปรึกษาแพทย์")
+            results['HCT'] = {"classification": "เม็ดเลือดจางปานกลาง", "recommendation": "ควรปรึกษาแพทย์"}
         elif hct < 27:
-            results['HCT'] = ("เม็ดเลือดจางรุนแรง", "ควรปรึกษาแพทย์โดยด่วน")
+            results['HCT'] = {"classification": "เม็ดเลือดจางรุนแรง", "recommendation": "ควรปรึกษาแพทย์โดยด่วน"}
 
     # Evaluate MCV
     if mcv < 80:
-        results['MCV'] = ("เม็ดเลือดแดงมีขนาดเล็ก", "อาจเกิดจากขาดธาตุเหล็ก หรือเป็นพาหะธาลัสซีเมีย")
+        results['MCV'] = {"classification": "เม็ดเลือดแดงมีขนาดเล็ก", "recommendation": "อาจเกิดจากขาดธาตุเหล็ก หรือเป็นพาหะธาลัสซีเมีย"}
     elif 80 <= mcv <= 100:
-        results['MCV'] = ("ปกติ", None)
+        results['MCV'] = {"classification": "ปกติ", "recommendation": None}
     elif mcv > 100:
-        results['MCV'] = ("เม็ดเลือดแดงมีขนาดใหญ่", "อาจเกิดจากขาดโฟเลต หรือวิตามินบี 12 หรือโรคเลือดบางชนิด")
+        results['MCV'] = {"classification": "เม็ดเลือดแดงมีขนาดใหญ่", "recommendation": "อาจเกิดจากขาดโฟเลต หรือวิตามินบี 12 หรือโรคเลือดบางชนิด"}
 
     # Evaluate WBC
-    if 6_000 <= wbc <= 10_000:
-        results['WBC'] = ("ปกติ", None)
+    if 6000 <= wbc <= 10000:
+        results['WBC'] = {"classification": "ปกติ", "recommendation": None}
     elif wbc < 6_000:
         neutro_count = wbc * neutrophile / 100
         if neutro_count < 1000:
-            results['WBC'] = ("เม็ดเลือดขาวต่ำอันตราย", "ควรปรึกษาแพทย์ ระวังการติดเชื้อ หลีกเลี่ยงอาหารดิบ")
+            results['WBC'] = {"classification": "เม็ดเลือดขาวต่ำอันตราย", "recommendation": "ควรปรึกษาแพทย์ ระวังการติดเชื้อ หลีกเลี่ยงอาหารดิบ"}
         else:
-            results['WBC'] = ("เม็ดเลือดขาวต่ำ", None)
+            results['WBC'] = {"classification": "เม็ดเลือดขาวต่ำ", "recommendation": None}
     elif 10_000 < wbc <= 20_000:
-        results['WBC'] = ("เม็ดเลือดขาวสูง", "อาจเกิดจากการติดเชื้อ หากมีไข้สูงหรือไข้เรื้อรัง ควรปรึกษาแพทย์")
+        results['WBC'] = {"classification": "เม็ดเลือดขาวสูง", "recommendation": "อาจเกิดจากการติดเชื้อ หากมีไข้สูงหรือไข้เรื้อรัง ควรปรึกษาแพทย์"}
     elif wbc > 20_000:
-        results['WBC'] = ("เม็ดเลือดขาวสูงมาก", "ควรปรึกษาแพทย์โดยด่วน")
+        results['WBC'] = {"classification": "เม็ดเลือดขาวสูงมาก", "recommendation": "ควรปรึกษาแพทย์โดยด่วน"}
 
     # Evaluate EOSINOPHILE
     eos_count = wbc * eosinophile / 100
     if eos_count > 500:
-        results['EOSINOPHILE'] = ("เม็ดเลือดขาว EOSINOPHILE สูง", "อาจเกิดจากภูมิแพ้ หอบหืด หรือพยาธิ")
+        results['Eosinophile'] = {"classification": "เม็ดเลือดขาว EOSINOPHILE สูง", "recommendation": "อาจเกิดจากภูมิแพ้ หอบหืด หรือพยาธิ"}
 
     # Evaluate MONOCYTE
     if 2 <= monocyte <= 6:
-        results['MONOCYTE'] = ("ปกติ", None)
+        results['Monocyte'] = {"classification": "ปกติ", "recommendation": None}
     elif monocyte > 6:
-        results['MONOCYTE'] = ("MONOCYTE สูง", "มักพบหลังติดเชื้อเกิน 2 สัปดาห์ หรือหลังฉีดวัคซีน")
+        results['Monocyte'] = {"classification": "MONOCYTE สูง", "recommendation": "มักพบหลังติดเชื้อเกิน 2 สัปดาห์ หรือหลังฉีดวัคซีน"}
 
     # Evaluate Platelets
-    if plt_count < 100_000:
-        results['PLT'] = ("เกล็ดเลือดต่ำ", "ควรระวังอาการเลือดออกผิดปกติ และควรพบแพทย์")
-    elif 100_000 <= plt_count <= 450_000:
-        results['PLT'] = ("ปกติ", None)
-    elif 450_000 < plt_count <= 600_000:
-        results['PLT'] = ("เกล็ดเลือดสูง", "อาจพบในพาหะธาลัสซีเมีย หรือมีอาการไข้เรื้อรัง ควรปรึกษาแพทย์")
-    elif plt_count > 600_000:
-        results['PLT'] = ("เกล็ดเลือดสูงมาก", "ควรปรึกษาแพทย์เพื่อหาสาเหตุ")
+    if plt_count < 100000:
+        results['PLT Count'] = {"classification": "เกล็ดเลือดต่ำ", "recommendation": "ควรระวังอาการเลือดออกผิดปกติ และควรพบแพทย์"}
+    elif 100000 <= plt_count <= 450000:
+        results['PLT Count'] = {"classification": "ปกติ", "recommendation": None}
+    elif 450000 < plt_count <= 600000:
+        results['PLT Count'] = {"classification": "เกล็ดเลือดสูง", "recommendation": "อาจพบในพาหะธาลัสซีเมีย หรือมีอาการไข้เรื้อรัง ควรปรึกษาแพทย์"}
+    elif plt_count > 600000:
+        results['PLT Count'] = {"classification": "เกล็ดเลือดสูงมาก", "recommendation": "ควรปรึกษาแพทย์เพื่อหาสาเหตุ"}
 
     return results
 
@@ -213,28 +286,28 @@ def evaluate_lab_results(lab_test_master_id, lab_item_values):
         )
     elif lab_test_master_id == 4:  # Liver Function
         return evaluate_liver_function(
-            lab_item_values['total_protein'],
-            lab_item_values['globulin'],
-            lab_item_values['albumin'],
-            lab_item_values['ast'],
-            lab_item_values['alt'],
-            lab_item_values['alp'],
-            lab_item_values['total_bilirubin'],
-            lab_item_values['direct_bilirubin'],
-            lab_item_values['gender']
+            lab_item_values['Total Protein'],
+            lab_item_values['Globulin'],
+            lab_item_values['Albumin'],
+            lab_item_values['AST'],
+            lab_item_values['ALT'],
+            lab_item_values['ALP'],
+            lab_item_values['Total Bilirubin'],
+            lab_item_values['Direct Bilirubin'],
+            lab_item_values['Gender']
         )
     elif lab_test_master_id == 5:  # Uric Acid
-        return evaluate_uric_acid(lab_item_values['uric_acid'], lab_item_values['gender'])
+        return evaluate_uric_acid(lab_item_values['Uric Acid'], lab_item_values['Gender'])
     elif lab_test_master_id == 6:  # Complete Blood Count (CBC)
         return evaluate_cbc(
-            lab_item_values['hct'],
-            lab_item_values['mcv'],
-            lab_item_values['wbc'],
-            lab_item_values['neutrophile'],
-            lab_item_values['eosinophile'],
-            lab_item_values['monocyte'],
-            lab_item_values['plt_count'],
-            lab_item_values['gender']
+            lab_item_values['HCT'],
+            lab_item_values['MCV'],
+            lab_item_values['WBC'],
+            lab_item_values['Neutrophile'],
+            lab_item_values['Eosinophile'],
+            lab_item_values['Monocyte'],
+            lab_item_values['PLT Count'],
+            lab_item_values['Gender']
         )
     else:
         return {"error": "Unknown lab test"}
