@@ -1,3 +1,4 @@
+// no need to fix
 // middleware to protect route 
 const jwt = require("jsonwebtoken");
 require('dotenv').config(); //load environment variables
