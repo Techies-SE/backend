@@ -117,6 +117,7 @@ router.post("/patients", upload.single("csvFile"), async (req, res) => {
 });
 
 
+
 router.post("/lab-data", upload.single("csvFile"), (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded");
 
