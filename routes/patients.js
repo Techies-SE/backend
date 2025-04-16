@@ -81,6 +81,71 @@ const saltRounds = 10;
 //     res.status(500).json({ error: error.message });
 //   }
 // });
+// router.post("/", async (req, res) => {
+//   const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
+
+//   // Validate required fields
+//   if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id || !lab_test_master_id) {
+//     return res.status(400).json({ error: "All fields are required." });
+//   }
+
+//   try {
+//     // Hash the citizen_id to create a password
+//     const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
+
+//     // Get a connection from the pool
+//     const connection = await db.getConnection();
+    
+//     try {
+//       // Start transaction
+//       await connection.beginTransaction();
+      
+//       // Insert into patients table
+//       await connection.query(
+//         `INSERT INTO patients 
+//          (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
+//          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+//         [
+//           hn_number,
+//           name,
+//           citizen_id,
+//           phone_no,
+//           hashedPassword,
+//           false,
+//           false,
+//           doctor_id,
+//         ]
+//       );
+      
+//       // Insert into lab_tests table
+//       const currentTimestamp = new Date();
+//       await connection.query(
+//         `INSERT INTO lab_tests 
+//          (hn_number, lab_test_master_id, status, lab_test_date)
+//          VALUES (?, ?, ?, ?)`,
+//         [hn_number, lab_test_master_id, "pending", currentTimestamp]
+//       );
+      
+//       // Commit transaction
+//       await connection.commit();
+      
+//       res.status(201).json({
+//         message: "Patient and lab test created successfully.",
+//       });
+      
+//     } catch (error) {
+//       // Rollback in case of error
+//       await connection.rollback();
+//       throw error;
+//     } finally {
+//       // Always release the connection
+//       connection.release();
+//     }
+//   } catch (error) {
+//     console.error("Error creating patient:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 router.post("/", async (req, res) => {
   const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
 
@@ -90,9 +155,6 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // Hash the citizen_id to create a password
-    const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
-
     // Get a connection from the pool
     const connection = await db.getConnection();
     
@@ -100,22 +162,55 @@ router.post("/", async (req, res) => {
       // Start transaction
       await connection.beginTransaction();
       
-      // Insert into patients table
-      await connection.query(
-        `INSERT INTO patients 
-         (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          hn_number,
-          name,
-          citizen_id,
-          phone_no,
-          hashedPassword,
-          false,
-          false,
-          doctor_id,
-        ]
+      // Check if patient already exists
+      const [existingPatients] = await connection.query(
+        "SELECT * FROM patients WHERE hn_number = ? OR citizen_id = ?",
+        [hn_number, citizen_id]
       );
+      
+      // Check for patient existence and potential conflicts
+      if (existingPatients.length > 0) {
+        const existingPatient = existingPatients[0];
+        
+        // Check for citizen_id conflict with different HN number
+        if (existingPatient.hn_number !== hn_number && existingPatient.citizen_id === citizen_id) {
+          return res.status(409).json({ 
+            error: `Citizen ID ${citizen_id} already exists with different HN number ${existingPatient.hn_number}` 
+          });
+        }
+        
+        // Check for HN number conflict with different citizen_id
+        if (existingPatient.hn_number === hn_number && existingPatient.citizen_id !== citizen_id) {
+          return res.status(409).json({ 
+            error: `HN number ${hn_number} already exists with different Citizen ID` 
+          });
+        }
+        
+        // If patient exists but all details match, we can proceed with just the lab test
+        console.log(`Patient with HN ${hn_number} already exists, adding lab test only`);
+      } else {
+        // Patient doesn't exist, create new patient
+        const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
+        
+        // Insert into patients table
+        await connection.query(
+          `INSERT INTO patients 
+           (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            hn_number,
+            name,
+            citizen_id,
+            phone_no,
+            hashedPassword,
+            false,
+            false,
+            doctor_id,
+          ]
+        );
+        
+        console.log(`Created new patient with HN ${hn_number}`);
+      }
       
       // Insert into lab_tests table
       const currentTimestamp = new Date();
@@ -130,7 +225,7 @@ router.post("/", async (req, res) => {
       await connection.commit();
       
       res.status(201).json({
-        message: "Patient and lab test created successfully.",
+        message: "Lab test created successfully.",
       });
       
     } catch (error) {
@@ -142,7 +237,7 @@ router.post("/", async (req, res) => {
       connection.release();
     }
   } catch (error) {
-    console.error("Error creating patient:", error);
+    console.error("Error processing patient request:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -268,6 +363,43 @@ router.put("/:appointmentId/confirm", async (req, res) => {
   }
 });
 
+// Patient click Cancel for any appointments
+router.put("/:appointmentId/cancel", async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const { hnNumber } = req.body; // For verification purposes
+    
+    // First, verify this appointment belongs to this patient
+    const [appointment] = await db.query(
+      `SELECT * FROM appointments WHERE id = ? AND hn_number = ?'`,
+      [appointmentId, hnNumber]
+    );
+    
+    if (appointment.length === 0) {
+      return res.status(404).json({ 
+        message: "Appointment not found or not eligible for cancellation" 
+      });
+    }
+    
+    // Update the appointment status to Scheduled
+    await db.query(
+      `UPDATE appointments SET status = 'canceled' WHERE id = ?`,
+      [appointmentId]
+    );
+    
+    res.json({ 
+      message: "Appointment confirmed successfully", 
+      appointmentId 
+    });
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Patient click Reschedule for any appointments
+
+
 // get a patient with lab test and lab test items
 router.get("/id=:id/lab-results", async (req, res) => {
   try {
@@ -353,4 +485,70 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// router.get('/details/:hn_number', async (req, res) => {
+//   const { hn_number } = req.params;
+
+//   try {
+//     // Query to fetch patient details and completed lab tests with recommendations
+//     const [rows] = await db.execute(`
+//       SELECT 
+//         p.hn_number,
+//         p.name AS patient_name,
+//         pd.gender,
+//         pd.blood_type,
+//         lt.lab_test_date,
+//         ltm.test_name AS lab_test_name,
+//         r.generated_recommendation,
+//         r.status AS recommendation_status
+//       FROM patients p
+//       JOIN patient_data pd ON p.hn_number = pd.hn_number
+//       LEFT JOIN lab_tests lt ON p.hn_number = lt.hn_number AND lt.status = 'completed'
+//       LEFT JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+//       LEFT JOIN recommendations r ON r.lab_test_id = lt.id AND r.status = 'sent'
+//       WHERE p.hn_number = ?
+//     `, [hn_number]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ success: false, message: 'Patient not found' });
+//     }
+
+//     res.status(200).json({ success: true, data: rows });
+//   } catch (err) {
+//     console.error('Error fetching patient details:', err);
+//     res.status(500).json({ success: false, message: 'Internal server error' });
+//   }
+// });
+router.get('/details/:hnNumber', async (req, res) => {
+  const { hnNumber } = req.params; // Get the hnNumber from URL parameters
+
+  try {
+    // Query to fetch completed lab tests, their items, and recommendations
+    const [rows] = await dbç.execute(`
+      SELECT 
+        p.hn_number,
+        p.name AS patient_name,
+        lt.lab_test_date,
+        ltm.test_name AS lab_test_name,
+        li.lab_item_name,
+        r.generated_recommendation
+      FROM patients p
+      JOIN lab_tests lt ON p.hn_number = lt.hn_number
+      JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+      JOIN lab_test_items lti ON lt.lab_test_master_id = lti.lab_test_master_id
+      JOIN lab_items li ON lti.lab_item_id = li.id
+      JOIN recommendations r ON r.lab_test_id = lt.id
+      WHERE lt.status = 'completed' AND r.status = 'sent' AND p.hn_number = ?
+      ORDER BY lt.lab_test_date DESC
+    `, [hnNumber]); // Use parameterized query to avoid SQL injection
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'No completed lab tests found for this patient.' });
+    }
+
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    console.error('Error fetching completed lab tests:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 module.exports = router;

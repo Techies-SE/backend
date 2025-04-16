@@ -86,4 +86,54 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// router.get('/patients-lab-tests/:doctorId', async (req, res) => {
+//     const { doctorId } = req.params;
+  
+//     try {
+//       const [rows] = await db.execute(`
+//         SELECT 
+//           p.hn_number,
+//           p.name AS patient_name,
+//           ltm.test_name AS lab_test_name,
+//           lt.lab_test_date
+//         FROM patients p
+//         JOIN lab_tests lt ON p.hn_number = lt.hn_number
+//         JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+//         WHERE p.doctor_id = ?
+//         ORDER BY lt.lab_test_date DESC
+//       `, [doctorId]);
+  
+//       res.status(200).json({ success: true, data: rows });
+//     } catch (err) {
+//       console.error('Error fetching patients and lab tests:', err);
+//       res.status(500).json({ success: false, message: 'Internal server error' });
+//     }
+//   });
+
+router.get('/patients-lab-tests/:doctorId', async (req, res) => {
+    const { doctorId } = req.params;
+  
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          p.id AS patient_id,        
+          p.hn_number,
+          p.name AS patient_name,
+          ltm.test_name AS lab_test_name,
+          lt.lab_test_date
+        FROM patients p
+        JOIN lab_tests lt ON p.hn_number = lt.hn_number
+        JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+        JOIN recommendations r ON r.lab_test_id = lt.id
+        WHERE p.doctor_id = ? AND r.status = 'sent'
+        ORDER BY lt.lab_test_date DESC
+      `, [doctorId]);
+  
+      res.status(200).json({ success: true, data: rows });
+    } catch (err) {
+      console.error('Error fetching patients and lab tests:', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
 module.exports = router;

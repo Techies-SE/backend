@@ -6,7 +6,7 @@ const db = require("../db");
 
 // Patient makes an appointment
 router.post("/confirmation", async (req, res) => {
-  const { hn_number, doctor_id, appointment_date, appointment_time } = req.body;
+  const { hn_number, doctor_id, appointment_date, appointment_time, notes } = req.body;
 
   try {
     if (!hn_number || !doctor_id || !appointment_date || !appointment_time) {
@@ -27,8 +27,8 @@ router.post("/confirmation", async (req, res) => {
 
     // Insert new appointment
     const [insertResult] = await db.query(
-      "INSERT INTO appointments (hn_number, doctor_id, appointment_date, appointment_time, status) VALUES (?, ?, ?, ?, ?)",
-      [hn_number, doctor_id, appointment_date, appointment_time, "pending"]
+      "INSERT INTO appointments (hn_number, doctor_id, appointment_date, appointment_time, status, notes) VALUES (?, ?, ?, ?, ?, ?)",
+      [hn_number, doctor_id, appointment_date, appointment_time, "pending", notes]
     );
 
     res.status(201).json({
