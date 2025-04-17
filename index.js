@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const bodyParser = require('body-parser');
 const patientsRoutes = require('./routes/patients');
 const labDataRoutes = require('./routes/lab_data');
@@ -19,6 +20,7 @@ const approvalRoute = require("./routes/appointment-apporval");
 const bulkRoute = require("./routes/bulk-upload");
 const labTestRoute = require("./routes/lab_tests");
 const generateRecommendationRoute = require("./routes/generateRecommendations");
+const imageUploadRoute = require("./routes/image_upload")
 const corse = require('cors');
 const db = require('./db'); // import the database connection
 
@@ -52,8 +54,9 @@ app.use('/appointments', approvalRoute);
 app.use('/bulk', bulkRoute);
 app.use('/lab-tests', labTestRoute);
 app.use('/api', generateRecommendationRoute);
+app.use('/image', imageUploadRoute);
 
-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Start the server
 app.listen(PORT, () => {

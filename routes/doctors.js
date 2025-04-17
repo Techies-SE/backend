@@ -34,15 +34,38 @@ router.get('/', async (req, res) => {
 
 // ***
 // get doctor by id
+// router.get("/id=:id", async (req, res) => {
+//     const doctorId = req.params.id;
+//     try {
+//       const [rows] = await db.query("SELECT * FROM doctors WHERE id = ?", [doctorId]);
+//       res.json(rows);
+//     } catch (err) {
+//       res.status(500).json({ error: err.message });
+//     }
+//   });
 router.get("/id=:id", async (req, res) => {
-    const doctorId = req.params.id;
-    try {
-      const [rows] = await db.query("SELECT * FROM doctors WHERE id = ?", [doctorId]);
-      res.json(rows);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
+  const doctorId = req.params.id;
+
+  try {
+    const [rows] = await db.query("SELECT * FROM doctors WHERE id = ?", [doctorId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Doctor not found' });
     }
-  });
+
+    const doctor = rows[0];
+
+    // Append full image URL if image exists
+    if (doctor.image) {
+      doctor.imageUrl = `http://localhost:3000/${doctor.image}`;
+    }
+
+    res.json(doctor);
+  } catch (err) {
+    console.error("Error fetching doctor:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 
 
