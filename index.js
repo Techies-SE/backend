@@ -20,7 +20,8 @@ const approvalRoute = require("./routes/appointment-apporval");
 const bulkRoute = require("./routes/bulk-upload");
 const labTestRoute = require("./routes/lab_tests");
 const generateRecommendationRoute = require("./routes/generateRecommendations");
-const imageUploadRoute = require("./routes/image_upload")
+const imageUploadRoute = require("./routes/image_upload");
+const detailsRoute = require("./routes/details");
 const corse = require('cors');
 const db = require('./db'); // import the database connection
 
@@ -55,6 +56,7 @@ app.use('/bulk', bulkRoute);
 app.use('/lab-tests', labTestRoute);
 app.use('/api', generateRecommendationRoute);
 app.use('/image', imageUploadRoute);
+app.use('/details', detailsRoute);
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

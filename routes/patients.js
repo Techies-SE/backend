@@ -7,145 +7,6 @@ const bcrypt = require("bcrypt");
 const saltRounds = 10;
 // ***
 // create a patient 
-// router.post("/", async (req, res) => {
-//   const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
-
-//   // Validate required fields
-//   if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id || !lab_test_master_id) {
-//     return res.status(400).json({ error: "All fields are required." });
-//   }
-
-//   try {
-//     // Hash the citizen_id to create a password
-//     const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
-
-//     // Start transaction
-//     db.beginTransaction((err) => {
-//       if (err) return res.status(500).json({ error: err.message });
-
-//       // Insert into patients table
-//       const patientQuery = `
-//         INSERT INTO patients (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
-//         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-
-//       const patientValues = [
-//         hn_number,
-//         name,
-//         citizen_id,
-//         phone_no,
-//         hashedPassword,
-//         false,
-//         false,
-//         doctor_id,
-//       ];
-
-//       db.query(patientQuery, patientValues, (err, results) => {
-//         if (err) {
-//           return db.rollback(() => {
-//             res.status(500).json({ error: err.message });
-//           });
-//         }
-
-//         // Insert into lab_tests table with current timestamp for lab_test_result_date
-//         const labTestQuery = `
-//           INSERT INTO lab_tests (hn_number, lab_test_master_id, status, lab_test_date)
-//           VALUES (?, ?, ?, ?)`;
-
-//         const currentTimestamp = new Date(); // or use: new Date().toISOString()
-//         const labTestValues = [hn_number, lab_test_master_id, "pending", currentTimestamp];
-
-//         db.query(labTestQuery, labTestValues, (err, labResults) => {
-//           if (err) {
-//             return db.rollback(() => {
-//               res.status(500).json({ error: err.message });
-//             });
-//           }
-
-//           // Commit transaction
-//           db.commit((err) => {
-//             if (err) {
-//               return db.rollback(() => {
-//                 res.status(500).json({ error: err.message });
-//               });
-//             }
-
-//             res.status(201).json({
-//               patient_id: results.insertId,
-//               message: "Patient and lab test created successfully.",
-//             });
-//           });
-//         });
-//       });
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-// router.post("/", async (req, res) => {
-//   const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
-
-//   // Validate required fields
-//   if (!hn_number || !name || !citizen_id || !phone_no || !doctor_id || !lab_test_master_id) {
-//     return res.status(400).json({ error: "All fields are required." });
-//   }
-
-//   try {
-//     // Hash the citizen_id to create a password
-//     const hashedPassword = await bcrypt.hash(citizen_id, saltRounds);
-
-//     // Get a connection from the pool
-//     const connection = await db.getConnection();
-    
-//     try {
-//       // Start transaction
-//       await connection.beginTransaction();
-      
-//       // Insert into patients table
-//       await connection.query(
-//         `INSERT INTO patients 
-//          (hn_number, name, citizen_id, phone_no, password, lab_data_status, account_status, doctor_id)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [
-//           hn_number,
-//           name,
-//           citizen_id,
-//           phone_no,
-//           hashedPassword,
-//           false,
-//           false,
-//           doctor_id,
-//         ]
-//       );
-      
-//       // Insert into lab_tests table
-//       const currentTimestamp = new Date();
-//       await connection.query(
-//         `INSERT INTO lab_tests 
-//          (hn_number, lab_test_master_id, status, lab_test_date)
-//          VALUES (?, ?, ?, ?)`,
-//         [hn_number, lab_test_master_id, "pending", currentTimestamp]
-//       );
-      
-//       // Commit transaction
-//       await connection.commit();
-      
-//       res.status(201).json({
-//         message: "Patient and lab test created successfully.",
-//       });
-      
-//     } catch (error) {
-//       // Rollback in case of error
-//       await connection.rollback();
-//       throw error;
-//     } finally {
-//       // Always release the connection
-//       connection.release();
-//     }
-//   } catch (error) {
-//     console.error("Error creating patient:", error);
-//     res.status(500).json({ error: error.message });
-//   }
-// });
 router.post("/", async (req, res) => {
   const { hn_number, name, citizen_id, phone_no, doctor_id, lab_test_master_id } = req.body;
 
@@ -207,6 +68,12 @@ router.post("/", async (req, res) => {
             false,
             doctor_id,
           ]
+        );
+
+         // INSERT into patient_data table
+         await connection.query(
+          `INSERT INTO patient_data (hn_number) VALUES (?)`,
+          [hn_number]
         );
         
         console.log(`Created new patient with HN ${hn_number}`);
