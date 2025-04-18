@@ -194,4 +194,48 @@ router.patch("/:schedule_id", async (req, res) => {
   }
 });
 
+router.get('/doctors', async (req, res) => {
+  try {
+    const [rows] = await db.execute(`
+      SELECT 
+        d.id AS doctor_id,
+        d.name AS doctor_name,
+        ds.day_of_week,
+        TIME_FORMAT(ds.start_time, '%H:%i:%s') AS start_time,
+        TIME_FORMAT(ds.end_time, '%H:%i:%s') AS end_time
+      FROM doctors d
+      JOIN doctor_schedules ds ON d.id = ds.doctor_id
+      WHERE d.status = 'active'
+      ORDER BY d.id, 
+               FIELD(ds.day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+    `);
+
+    const grouped = {};
+
+    rows.forEach(row => {
+      if (!grouped[row.doctor_id]) {
+        grouped[row.doctor_id] = {
+          doctor_id: row.doctor_id,
+          doctor_name: row.doctor_name,
+          schedules: []
+        };
+      }
+      grouped[row.doctor_id].schedules.push({
+        day: row.day_of_week,
+        start_time: row.start_time,
+        end_time: row.end_time
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      data: Object.values(grouped)
+    });
+
+  } catch (error) {
+    console.error('Error fetching doctor schedules:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;

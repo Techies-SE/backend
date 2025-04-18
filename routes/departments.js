@@ -90,12 +90,40 @@ router.delete('/image/delete/:id', async (req, res) => {
 
 
 // Create a department
-router.post('/', async (req, res) => {
-  const { name } = req.body;
+// router.post('/', async (req, res) => {
+//   const { name } = req.body;
+
+//   try {
+//     const [result] = await db.query('INSERT INTO departments (name) VALUES (?)', [name]);
+//     res.status(201).json({ id: result.insertId });
+//   } catch (err) {
+//     console.error('Error creating department:', err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+router.post('/', upload.single('image'), async (req, res) => {
+  const { name, description } = req.body;
+  let imagePath = null;
+
+  if (req.file) {
+    imagePath = `uploads/${req.file.filename}`;
+  }
 
   try {
-    const [result] = await db.query('INSERT INTO departments (name) VALUES (?)', [name]);
-    res.status(201).json({ id: result.insertId });
+    const [result] = await db.query(
+      'INSERT INTO departments (name, description, image) VALUES (?, ?, ?)',
+      [name, description || null, imagePath]
+    );
+
+    res.status(201).json({
+      message: 'Department created successfully',
+      department: {
+        id: result.insertId,
+        name,
+        description: description || null,
+        image: imagePath ? `http://localhost:3000/${imagePath}` : null
+      }
+    });
   } catch (err) {
     console.error('Error creating department:', err);
     res.status(500).json({ error: err.message });
@@ -181,49 +209,6 @@ router.get('/id=:id', async (req, res) => {
   }
 });
 
-// router.get('/:id', async (req, res) => {
-//   const departmentId = req.params.id;
-
-//   const query = `
-//     SELECT d.id AS department_id, d.name AS department_name, d.description AS department_description, d.image AS department_image,
-//            doc.name AS doctor_name, 
-//            doc.phone_no, doc.email, doc.specialization
-//     FROM departments d
-//     LEFT JOIN doctors doc ON d.id = doc.department_id
-//     WHERE d.id = ?;
-//   `;
-
-//   try {
-//     const [results] = await db.query(query, [departmentId]);
-
-//     if (results.length === 0) {
-//       return res.status(404).json({ message: 'Department not found' });
-//     }
-
-//     const department = {
-//       id: results[0].department_id,
-//       name: results[0].department_name,
-//       description: results[0].department_description,
-//       image: results[0].department_image,
-//       doctors: results
-//         .filter(row => row.doctor_id !== null)
-//         .map(row => ({
-//           //id: row.doctor_id,
-//           name: row.doctor_name,
-//           phone_no: row.phone_no,
-//           email: row.email,
-//           specialization: row.specialization,
-//           //status: row.status
-//         }))
-//     };
-
-//     res.json(department);
-//   } catch (err) {
-//     console.error('Error fetching department details:', err);
-//     res.status(500).json({ error: err.message });
-//   }
-// });
-
 router.get('/:id', async (req, res) => {
   const departmentId = req.params.id;
 
@@ -267,6 +252,44 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// DELETE department by ID (including image cleanup)
+router.delete('/:id', async (req, res) => {
+  const departmentId = req.params.id;
+
+  try {
+    // Step 1: Get current image path
+    const [rows] = await db.execute(
+      'SELECT image FROM departments WHERE id = ?',
+      [departmentId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+
+    const imagePath = rows[0].image;
+
+    // Step 2: Delete image from disk (if exists)
+    if (imagePath) {
+      const fullPath = path.join(__dirname, '..', imagePath);
+      fs.unlink(fullPath, (err) => {
+        if (err && err.code !== 'ENOENT') {
+          console.warn('Image file deletion failed:', err);
+        }
+      });
+    }
+
+    // Step 3: Delete department from DB
+    await db.execute('DELETE FROM departments WHERE id = ?', [departmentId]);
+
+    res.json({ message: 'Department deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting department:', err);
+    res.status(500).json({ error: 'Failed to delete department' });
+  }
+});
+
 
 
 
