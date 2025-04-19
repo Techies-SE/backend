@@ -34,15 +34,6 @@ router.get('/', async (req, res) => {
 
 // ***
 // get doctor by id
-// router.get("/id=:id", async (req, res) => {
-//     const doctorId = req.params.id;
-//     try {
-//       const [rows] = await db.query("SELECT * FROM doctors WHERE id = ?", [doctorId]);
-//       res.json(rows);
-//     } catch (err) {
-//       res.status(500).json({ error: err.message });
-//     }
-//   });
 router.get("/id=:id", async (req, res) => {
   const doctorId = req.params.id;
 
@@ -109,29 +100,50 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// router.get('/patients-lab-tests/:doctorId', async (req, res) => {
-//     const { doctorId } = req.params;
-  
-//     try {
-//       const [rows] = await db.execute(`
-//         SELECT 
-//           p.hn_number,
-//           p.name AS patient_name,
-//           ltm.test_name AS lab_test_name,
-//           lt.lab_test_date
-//         FROM patients p
-//         JOIN lab_tests lt ON p.hn_number = lt.hn_number
-//         JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
-//         WHERE p.doctor_id = ?
-//         ORDER BY lt.lab_test_date DESC
-//       `, [doctorId]);
-  
-//       res.status(200).json({ success: true, data: rows });
-//     } catch (err) {
-//       console.error('Error fetching patients and lab tests:', err);
-//       res.status(500).json({ success: false, message: 'Internal server error' });
-//     }
-//   });
+router.patch("/:id", async (req, res) => {
+  const doctorId = req.params.id;
+  const { name, phone_no, email } = req.body;
+
+  const updates = [];
+  const values = [];
+
+  if (name !== undefined) {
+    updates.push("name = ?");
+    values.push(name);
+  }
+
+  if (phone_no !== undefined) {
+    updates.push("phone_no = ?");
+    values.push(phone_no);
+  }
+
+  if (email !== undefined) {
+    updates.push("email = ?");
+    values.push(email);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ message: "No valid fields provided for update" });
+  }
+
+  // Add updated_at timestamp
+  updates.push("updated_at = NOW()");
+
+  try {
+    const connection = await db.getConnection();
+
+    await connection.query(
+      `UPDATE doctors SET ${updates.join(", ")} WHERE id = ?`,
+      [...values, doctorId]
+    );
+
+    connection.release();
+    res.json({ message: "Doctor information updated successfully" });
+  } catch (err) {
+    console.error("Error updating doctor:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 router.get('/patients-lab-tests/:doctorId', async (req, res) => {
     const { doctorId } = req.params;

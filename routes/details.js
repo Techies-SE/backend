@@ -149,5 +149,70 @@ router.get("/:hn_number", async (req, res) => {
       res.status(500).json({ message: "Server error" });
     }
   });
+
+  router.put("/:hn_number", async (req, res) => {
+    const hn_number = req.params.hn_number;
+    const {
+      name,
+      citizen_id,
+      phone_no,
+      doctor_id,
+      gender,
+      blood_type,
+      age,
+      date_of_birth,
+      weight,
+      height,
+      bmi,
+    } = req.body;
+  
+    try {
+      const connection = await db.getConnection();
+  
+      // Update patients table
+      await connection.query(
+        `
+        UPDATE patients
+        SET name = ?, citizen_id = ?, phone_no = ?, doctor_id = ?, updated_at = NOW()
+        WHERE hn_number = ?
+        `,
+        [name, citizen_id, phone_no, doctor_id, hn_number]
+      );
+  
+      // Check if patient_data exists
+      const [existingData] = await connection.query(
+        "SELECT id FROM patient_data WHERE hn_number = ?",
+        [hn_number]
+      );
+  
+      if (existingData.length > 0) {
+        // Update patient_data table
+        await connection.query(
+          `
+          UPDATE patient_data
+          SET gender = ?, blood_type = ?, age = ?, date_of_birth = ?, weight = ?, height = ?, bmi = ?
+          WHERE hn_number = ?
+          `,
+          [gender, blood_type, age, date_of_birth, weight, height, bmi, hn_number]
+        );
+      } else {
+        // Insert into patient_data if it doesn't exist
+        await connection.query(
+          `
+          INSERT INTO patient_data (hn_number, gender, blood_type, age, date_of_birth, weight, height, bmi)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [hn_number, gender, blood_type, age, date_of_birth, weight, height, bmi]
+        );
+      }
+  
+      connection.release();
+  
+      res.json({ message: "Patient data updated successfully" });
+    } catch (err) {
+      console.error("Error updating patient:", err);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
   
   module.exports = router;
