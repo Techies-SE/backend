@@ -6,9 +6,13 @@ const { spawn } = require("child_process");
 const csv = require("csv-parser");
 const fs = require("fs");
 const path = require("path");
-const upload = require("../middlewear/upload"); 
+const upload = require("../middlewear/upload");
 
 const pythonScriptPath = path.join(__dirname, "../rule-based/script.py");
+
+const {
+  generateAndSaveRecommendation,
+} = require("../services/generateAndSaveRecommendations");
 
 // Define runPythonProcess properly
 async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
@@ -528,7 +532,7 @@ async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
 //       //     : "unknown";
 
 //       //   await connection.execute(
-//       //     `UPDATE lab_results SET lab_item_status = ? 
+//       //     `UPDATE lab_results SET lab_item_status = ?
 //       //      WHERE lab_test_id = ? AND lab_item_id = ?`,
 //       //     [status, labTestId, matched.lab_item_id]
 //       //   );
@@ -538,18 +542,18 @@ async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
 //           (u) => u.lab_item_id === item.lab_item_id
 //         );
 //         if (!matched) continue;
-      
+
 //         // Debug logging
 //         console.log(`Matching item: ${matched.lab_item_name}`);
 //         console.log(`Looking for key in: ${Object.keys(statuses).join(', ')}`);
-      
+
 //         // Handle different key formats
 //         const possibleKeys = [
 //           matched.lab_item_name.toLowerCase().replace(/\s+/g, '_'), // "uric_acid"
 //           matched.lab_item_name, // Original name if it matches exactly
 //           matched.lab_item_name.replace(/\s+/g, '') // Without spaces
 //         ];
-      
+
 //         let status = "unknown";
 //         for (const key of possibleKeys) {
 //           if (statuses[key] && statuses[key].classification) {
@@ -557,11 +561,11 @@ async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
 //             break;
 //           }
 //         }
-      
+
 //         console.log(`Found status: ${status}`);
-      
+
 //         await connection.execute(
-//           `UPDATE lab_results SET lab_item_status = ? 
+//           `UPDATE lab_results SET lab_item_status = ?
 //            WHERE lab_test_id = ? AND lab_item_id = ?`,
 //           [status, labTestId, matched.lab_item_id]
 //         );
@@ -575,7 +579,7 @@ async function runPythonProcess(scriptPath, labTestMasterId, inputForPython) {
 
 //       // Update patient lab_data_status = true
 //       await connection.execute(
-//         `UPDATE patients SET lab_data_status = true 
+//         `UPDATE patients SET lab_data_status = true
 //          WHERE hn_number = (
 //             SELECT hn_number FROM lab_tests WHERE id = ?
 //          )`,
@@ -657,21 +661,23 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
 
           if (testRows.length > 0) {
             const labTestId = testRows[0].id; // Get the lab test ID
-            
+
             // Check if we've already processed gender for this test
             const testKey = `${labTestId}|${labTestMasterId}`;
             if (processedGenderForTests.has(testKey)) {
-              console.log(`⏭️ Gender already processed for lab test ID ${labTestId}. Skipping duplicate.`);
+              console.log(
+                `⏭️ Gender already processed for lab test ID ${labTestId}. Skipping duplicate.`
+              );
               continue;
             }
-            
+
             // First check if gender already exists for this test
             const [existingGender] = await connection.execute(
               `SELECT id FROM lab_results 
                WHERE lab_test_id = ? AND lab_item_id = ?`,
               [labTestId, 9] // Assuming 9 is the ID for Gender
             );
-            
+
             if (existingGender.length > 0) {
               // Update existing gender record instead of inserting a new one
               await connection.execute(
@@ -679,7 +685,9 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
                  WHERE lab_test_id = ? AND lab_item_id = ?`,
                 [labItemValue, labTestId, 9]
               );
-              console.log(`♻️ Updated existing gender value for lab test ID ${labTestId}`);
+              console.log(
+                `♻️ Updated existing gender value for lab test ID ${labTestId}`
+              );
             } else {
               // Insert the gender value into lab_results
               await connection.execute(
@@ -687,9 +695,11 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
                  VALUES (?, ?, ?)`,
                 [labTestId, 9, labItemValue] // Assuming 9 is the ID for Gender
               );
-              console.log(`✅ Inserted gender value for lab test ID ${labTestId}`);
+              console.log(
+                `✅ Inserted gender value for lab test ID ${labTestId}`
+              );
             }
-            
+
             // Mark this test as having gender processed
             processedGenderForTests.add(testKey);
             insertedLabTests.add(testKey); // Track processed tests
@@ -781,7 +791,7 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
          WHERE lab_test_id = ? AND lab_item_id = ?`,
         [labTestId, labItemId]
       );
-      
+
       if (existingResult.length > 0) {
         // Update existing record instead of inserting a new one
         await connection.execute(
@@ -832,9 +842,9 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
       );
 
       // Check if all required items are present
-      const requiredIds = new Set(requiredItems.map(r => r.lab_item_id));
-      const uploadedIds = new Set(uploadedItems.map(u => u.lab_item_id));
-      
+      const requiredIds = new Set(requiredItems.map((r) => r.lab_item_id));
+      const uploadedIds = new Set(uploadedItems.map((u) => u.lab_item_id));
+
       // Check if all required items are uploaded
       let allItemsUploaded = true;
       for (const id of requiredIds) {
@@ -843,7 +853,7 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
           break;
         }
       }
-      
+
       if (!allItemsUploaded) {
         console.log(`⏳ Lab test ${labTestId} incomplete. Still pending.`);
         continue;
@@ -872,19 +882,19 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
       for (const item of uploadedItems) {
         // Skip gender for status updates
         if (item.lab_item_name === "Gender") continue;
-        
+
         // Debug logging
         console.log(`Matching item: ${item.lab_item_name}`);
-        console.log(`Looking for key in: ${Object.keys(statuses).join(', ')}`);
-      
+        console.log(`Looking for key in: ${Object.keys(statuses).join(", ")}`);
+
         // Handle different key formats
         const possibleKeys = [
-          item.lab_item_name.toLowerCase().replace(/\s+/g, '_'), // "uric_acid"
+          item.lab_item_name.toLowerCase().replace(/\s+/g, "_"), // "uric_acid"
           item.lab_item_name.toLowerCase(), // lowercase
           item.lab_item_name, // Original name if it matches exactly
-          item.lab_item_name.replace(/\s+/g, '') // Without spaces
+          item.lab_item_name.replace(/\s+/g, ""), // Without spaces
         ];
-      
+
         let status = "unknown";
         for (const key of possibleKeys) {
           if (statuses[key] && statuses[key].classification) {
@@ -892,9 +902,9 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
             break;
           }
         }
-      
+
         console.log(`Found status: ${status}`);
-      
+
         await connection.execute(
           `UPDATE lab_results SET lab_item_status = ? 
            WHERE lab_test_id = ? AND lab_item_id = ?`,
@@ -917,8 +927,26 @@ router.post("/upload-lab-results", upload.single("file"), async (req, res) => {
         [labTestId]
       );
     }
-
     await connection.commit();
+    // 🔥 After the commit is successful
+    for (const entry of insertedLabTests) {
+      const [labTestIdStr] = entry.split("|");
+      const labTestId = parseInt(labTestIdStr);
+
+      try {
+        const result = await generateAndSaveRecommendation(labTestId);
+        console.log(
+          `💡 Recommendation generated for lab test ${labTestId}:`,
+          result
+        );
+      } catch (recommendationError) {
+        console.error(
+          `⚠️ Failed to generate recommendation for lab test ${labTestId}:`,
+          recommendationError.message
+        );
+      }
+    }
+
     res
       .status(200)
       .json({ message: "Lab results uploaded and processed successfully." });

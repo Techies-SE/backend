@@ -122,4 +122,134 @@ router.get("/id=:id/lab-results", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/doctor", authenticateToken, async (req, res) => {
+  // Verify the user is a doctor
+  if (req.user.role !== 'doctor') {
+    return res.status(403).json({ error: "Access denied. Doctor role required" });
+  }
+
+  const doctorId = req.user.id;
+  let connection;
+
+  try {
+    connection = await pool.getConnection();
+
+    // Get doctor information (excluding password)
+    const [doctorResults] = await connection.query(
+      `SELECT 
+         id, name, phone_no, email, specialization, 
+         status, department_id, registered_at, 
+         updated_at, image
+       FROM doctors 
+       WHERE id = ?`,
+      [doctorId]
+    );
+
+    if (doctorResults.length === 0) {
+      return res.status(404).json({ error: "Doctor not found" });
+    }
+
+    const doctor = doctorResults[0];
+
+    // Optionally get department information
+    const [departmentResults] = await connection.query(
+      `SELECT name FROM departments WHERE id = ?`,
+      [doctor.department_id]
+    );
+
+    // Optionally get appointment statistics
+    const [appointmentStats] = await connection.query(
+      `SELECT 
+         COUNT(*) as total_appointments,
+         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_appointments
+       FROM appointments 
+       WHERE doctor_id = ?`,
+      [doctorId]
+    );
+
+    res.json({
+      message: "Doctor profile retrieved successfully",
+      doctor: {
+        ...doctor,
+        department: departmentResults[0]?.name || null,
+        stats: {
+          total_appointments: appointmentStats[0]?.total_appointments || 0,
+          completed_appointments: appointmentStats[0]?.completed_appointments || 0
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error("Doctor profile error:", err);
+    res.status(500).json({ error: "Database error" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get("/admin", authenticateToken, async (req, res) => {
+  // Verify the user is a doctor
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: "Access denied. Admin role required" });
+  }
+
+  const adminId = req.user.id;
+  let connection;
+
+  try {
+    connection = await pool.getConnection();
+
+    // Get doctor information (excluding password)
+    const [adminResults] = await connection.query(
+      `SELECT 
+         id, name, phone_no, email,
+         status,registered_at, 
+         updated_at
+       FROM admin 
+       WHERE id = ?`,
+      [adminId]
+    );
+
+    if (adminResults.length === 0) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    const admin = adminResults[0];
+
+    // Optionally get department information
+    // const [departmentResults] = await connection.query(
+    //   `SELECT name FROM departments WHERE id = ?`,
+    //   [doctor.department_id]
+    // );
+
+    // Optionally get appointment statistics
+    // const [appointmentStats] = await connection.query(
+    //   `SELECT 
+    //      COUNT(*) as total_appointments,
+    //      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_appointments
+    //    FROM appointments 
+    //    WHERE doctor_id = ?`,
+    //   [doctorId]
+    // );
+
+    res.json({
+      message: "Admin profile retrieved successfully",
+      admin: {
+        ...admin,
+        // department: departmentResults[0]?.name || null,
+        // stats: {
+        //   total_appointments: appointmentStats[0]?.total_appointments || 0,
+        //   completed_appointments: appointmentStats[0]?.completed_appointments || 0
+        // }
+      }
+    });
+
+  } catch (err) {
+    console.error("Doctor profile error:", err);
+    res.status(500).json({ error: "Database error" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 module.exports = router;

@@ -50,6 +50,88 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Admin Login
+router.post("/admin", async (req, res) => {
+  console.log("Request body:", req.body);
+  const { email, password } = req.body;
+
+
+  try {
+    const [results] = await db.query("SELECT * FROM admin WHERE email = ?", [email]);
+
+    if (results.length === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const admin = results[0];
+    const isMatch = await bcrypt.compare(password, admin.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: admin.id, email: admin.email, role: 'admin' },
+      SECRET_KEY,
+      { expiresIn: process.env.TOKEN_EXPIRY || "8h" }
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: 'admin'
+      }
+    });
+  } catch (err) {
+    console.error("Admin login error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// Doctor Login
+router.post("/doctor", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const [results] = await db.query("SELECT * FROM doctors WHERE email = ?", [email]);
+
+    if (results.length === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const doctor = results[0];
+    const isMatch = await bcrypt.compare(password, doctor.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: doctor.id, email: doctor.email, role: 'doctor' },
+      SECRET_KEY,
+      { expiresIn: process.env.TOKEN_EXPIRY || "8h" }
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: doctor.id,
+        name: doctor.name,
+        email: doctor.email,
+        role: 'doctor'
+      }
+    });
+  } catch (err) {
+    console.error("Doctor login error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 // Change Password
 router.post("/change-password", authenticateToken, async (req, res) => {
   const { userId, newPassword } = req.body;
