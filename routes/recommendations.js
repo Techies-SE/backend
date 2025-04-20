@@ -214,9 +214,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
-
-
 router.post("/send-recommendation", async (req, res) => {
   const { recommendationId } = req.body;
 
