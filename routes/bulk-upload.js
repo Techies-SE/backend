@@ -6,7 +6,7 @@ const { spawn } = require("child_process");
 const csv = require("csv-parser");
 const fs = require("fs");
 const path = require("path");
-const upload = require("../middlewear/upload"); // Fix the typo from "middlewear" to "middlewares"
+const upload = require("../middlewear/upload"); 
 
 const pythonScriptPath = path.join(__dirname, "../rule-based/script.py");
 
