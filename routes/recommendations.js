@@ -23,42 +23,6 @@ router.post("/", async (req, res) => {
 });
 
 // Get all recommendations
-// router.get("/", async (req, res) => {
-//   try {
-//     const [results] = await pool.query("SELECT * FROM recommendations");
-
-//     res.json(results);
-//   } catch (err) {
-//     res.status(500).json({ error: err.message });
-//   }
-// });
-
-// router.get("/pending-recommendations", async (req, res) => {
-//   try {
-//     const [rows] = await pool.execute(`
-//         SELECT
-//           p.hn_number,
-//           p.name AS patient_name,
-//           d.name AS doctor_name,
-//           ltm.test_name AS lab_test_name,
-//           r.generated_recommendation,
-//           r.status
-//         FROM recommendations r
-//         JOIN lab_tests lt ON r.lab_test_id = lt.id
-//         JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
-//         JOIN patients p ON lt.hn_number = p.hn_number
-//         JOIN doctors d ON p.doctor_id = d.id
-//         WHERE r.status = 'pending'
-//         ORDER BY r.updated_at DESC
-//       `);
-
-//     res.status(200).json({ success: true, data: rows });
-//   } catch (err) {
-//     console.error("Error fetching pending recommendations:", err);
-//     res.status(500).json({ success: false, message: "Internal server error" });
-//   }
-// });
-
 router.get("/", async (req, res) => {
   try {
     const [rows] = await pool.execute(`
