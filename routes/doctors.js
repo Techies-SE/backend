@@ -3,21 +3,40 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const bcrypt = require('bcrypt');
 
 // using
 // create a doctor 
+// router.post('/', async (req, res) => {
+//     const { name, phone_no, email, password, specialization, status, department_id } = req.body;
+//     const query = `
+//         INSERT INTO doctors (name, phone_no, email, password, specialization, status, department_id) 
+//         VALUES (?, ?, ?, ?, ?, ?, ?)
+//     `;
+//     try {
+//         const [results] = await db.query(query, [name, phone_no, email, password, specialization, status, department_id]);
+//         res.status(201).json({ id: results.insertId });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message });
+//     }
+// });
 router.post('/', async (req, res) => {
-    const { name, phone_no, email, password, specialization, status, department_id } = req.body;
-    const query = `
-        INSERT INTO doctors (name, phone_no, email, password, specialization, status, department_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-    try {
-        const [results] = await db.query(query, [name, phone_no, email, password, specialization, status, department_id]);
-        res.status(201).json({ id: results.insertId });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  const { name, phone_no, email, specialization, status, department_id } = req.body;
+
+  try {
+      const hashedPassword = await bcrypt.hash(phone_no, 10); // hash phone_no as password
+
+      const query = `
+          INSERT INTO doctors (name, phone_no, email, password, specialization, status, department_id) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const [results] = await db.query(query, [name, phone_no, email, hashedPassword, specialization, status, department_id]);
+
+      res.status(201).json({ id: results.insertId });
+  } catch (err) {
+      res.status(500).json({ error: err.message });
+  }
 });
 
 
