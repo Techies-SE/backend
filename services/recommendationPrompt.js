@@ -23,3 +23,4 @@ Format your response as:
 Use medical terminology. Be direct, specific, and precise. Avoid conversational language.
   `.trim();
 }
+

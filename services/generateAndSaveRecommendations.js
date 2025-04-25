@@ -58,3 +58,4 @@ module.exports.generateAndSaveRecommendation = async function(lab_test_id) {
     throw error;
   }
 }
+
