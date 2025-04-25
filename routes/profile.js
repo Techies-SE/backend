@@ -24,10 +24,9 @@ router.get("/", authenticateToken, async (req, res) => {
     const patient = patientResults[0];
 
     const [labResults] = await connection.query(
-      `SELECT gender, blood_type, age, date_of_birth, weight, height, bmi, systolic, diastolic, order_date 
+      `SELECT gender, blood_type, age, date_of_birth, weight, height, bmi 
        FROM patient_data 
-       WHERE hn_number = ? 
-       ORDER BY order_date DESC`,
+       WHERE hn_number = ? `,
       [patient.hn_number]
     );
 

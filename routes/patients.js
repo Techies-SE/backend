@@ -179,7 +179,8 @@ router.get("/id=:id/appointments", async (req, res) => {
                 'appointment_time', a.appointment_time,
                 'specialization', d.specialization,
                 'status', a.status,
-                'doctor', d.name
+                'doctor', d.name,
+                'doctor_id', d.id
             )
         ) AS appointments
       FROM appointments a
@@ -204,7 +205,7 @@ router.put("/:appointmentId/confirm", async (req, res) => {
     
     // First, verify this appointment belongs to this patient and is in Rescheduled status
     const [appointment] = await db.query(
-      `SELECT * FROM appointments WHERE id = ? AND hn_number = ? AND status = 'Rescheduled'`,
+      `SELECT * FROM appointments WHERE id = ? AND hn_number = ? AND status = 'rescheduled'`,
       [appointmentId, hnNumber]
     );
     
@@ -238,7 +239,7 @@ router.put("/:appointmentId/cancel", async (req, res) => {
     
     // First, verify this appointment belongs to this patient
     const [appointment] = await db.query(
-      `SELECT * FROM appointments WHERE id = ? AND hn_number = ?'`,
+      `SELECT * FROM appointments WHERE id = ? AND hn_number = ?`,
       [appointmentId, hnNumber]
     );
     
@@ -265,6 +266,57 @@ router.put("/:appointmentId/cancel", async (req, res) => {
 });
 
 // Patient click Reschedule for any appointments
+// Patient reschedules an appointment
+router.patch("/:appointmentId/reschedule", async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const { doctor_id, hn_number, appointment_date, appointment_time } = req.body;
+
+    // Step 1: Verify that the appointment belongs to the patient and matches doctor_id
+    const [existingAppointments] = await db.query(
+      `SELECT * FROM appointments WHERE id = ? AND hn_number = ? AND doctor_id = ?`,
+      [appointmentId, hn_number, doctor_id]
+    );
+
+    if (existingAppointments.length === 0) {
+      return res.status(404).json({ 
+        message: "Appointment not found or access denied" 
+      });
+    }
+
+    const currentAppointment = existingAppointments[0];
+
+    // Step 2: Check if appointment_date or appointment_time is changing
+    const isDateChanged = appointment_date && appointment_date !== currentAppointment.appointment_date;
+    const isTimeChanged = appointment_time && appointment_time !== currentAppointment.appointment_time;
+
+    if (!isDateChanged && !isTimeChanged) {
+      return res.status(400).json({
+        message: "No changes detected in appointment date or time"
+      });
+    }
+
+    // Step 3: Update the appointment with new values and set status to Pending
+    await db.query(
+      `UPDATE appointments 
+       SET appointment_date = ?, appointment_time = ?, status = 'pending' 
+       WHERE id = ?`,
+      [
+        appointment_date || currentAppointment.appointment_date,
+        appointment_time || currentAppointment.appointment_time,
+        appointmentId
+      ]
+    );
+
+    res.json({
+      message: "Appointment rescheduled successfully. Status set to Pending.",
+      appointmentId
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 // get a patient with lab test and lab test items
@@ -418,4 +470,84 @@ router.get('/details/:hnNumber', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// patients lab tests
+router.get('/lab-tests/:hn_number', async (req, res) => {
+  const { hn_number } = req.params;
+
+  try {
+    const [rows] = await db.execute(`
+      SELECT 
+        lt.id AS lab_test_id,
+        lt.lab_test_date,
+        ltm.test_name
+      FROM lab_tests lt
+      JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+      WHERE lt.hn_number = ?
+      ORDER BY lt.lab_test_date DESC
+    `, [hn_number]);
+
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching lab tests for patient:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// each lab tests lab items
+router.get('/lab-test-items/:lab_test_id', async (req, res) => {
+  const { lab_test_id } = req.params;
+
+  try {
+    const [rows] = await db.execute(`
+      SELECT 
+        li.id AS lab_item_id,
+        li.lab_item_name,
+        li.unit,
+        ref.normal_range,
+        lr.lab_item_value,
+        lr.lab_item_status,
+        lt.lab_test_date
+      FROM lab_results lr
+      JOIN lab_items li ON lr.lab_item_id = li.id
+      JOIN lab_references ref ON ref.lab_item_id = li.id
+      JOIN lab_tests lt ON lr.lab_test_id = lt.id
+      WHERE lr.lab_test_id = ?
+    `, [lab_test_id]);
+
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching lab items:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+router.get('/lab-test/:lab_test_id/recommendations', async (req, res) => {
+  const { lab_test_id } = req.params;
+
+  try {
+    const [rows] = await db.execute(`
+      SELECT 
+        r.id AS recommendation_id,
+        r.status AS recommendation_status,
+        r.updated_at,
+        r.generated_recommendation,
+        d.name AS doctor_name,
+        d.specialization,
+        lt.lab_test_date,
+        ltm.test_name
+      FROM recommendations r
+      JOIN lab_tests lt ON r.lab_test_id = lt.id
+      JOIN lab_tests_master ltm ON lt.lab_test_master_id = ltm.id
+      JOIN doctors d ON r.doctor_id = d.id
+      WHERE r.lab_test_id = ?
+    `, [lab_test_id]);
+
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

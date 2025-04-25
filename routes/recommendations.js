@@ -210,4 +210,167 @@ router.post("/send-recommendation", async (req, res) => {
   }
 });
 
+// edit r
+router.patch('/:lab_test_id', async (req, res) => {
+  try {
+    const { lab_test_id } = req.params;
+    const { generated_recommendation } = req.body;
+    
+    if (!generated_recommendation) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Generated recommendation is required' 
+      });
+    }
+
+    // Get connection from pool
+    const connection = await pool.getConnection();
+    
+    try {
+      // Update the recommendation in the database
+      const [result] = await connection.query(
+        'UPDATE recommendations SET generated_recommendation = ?, updated_at = NOW() WHERE lab_test_id = ?',
+        [generated_recommendation, lab_test_id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Recommendation not found or no changes made'
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Recommendation updated successfully',
+        data: {
+          lab_test_id,
+          generated_recommendation,
+          updated_at: new Date()
+        }
+      });
+    } finally {
+      // Release connection back to the pool
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error updating recommendation:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update recommendation',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Update the approval status for a recommendation
+ * PATCH /api/recommendations/:lab_test_id/approve
+ */
+router.patch('/:lab_test_id/approve', async (req, res) => {
+  try {
+    const { lab_test_id } = req.params;
+    
+    // Get connection from pool
+    const connection = await pool.getConnection();
+    
+    try {
+      // Update the recommendation status in the database
+      const [result] = await connection.query(
+        'UPDATE recommendations SET status = "approved", updated_at = NOW() WHERE lab_test_id = ?',
+        [lab_test_id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Recommendation not found or no changes made'
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Recommendation approved successfully',
+        data: {
+          lab_test_id,
+          recommendation_status: 'approved',
+          updated_at: new Date()
+        }
+      });
+    } finally {
+      // Release connection back to the pool
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error approving recommendation:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to approve recommendation',
+      error: error.message
+    });
+  }
+});
+
+// send r to p
+// router.patch('/:lab_test_id/send', async (req, res) => {
+//   try {
+//     const { lab_test_id } = req.params;
+    
+//     // Get connection from pool
+//     const connection = await pool.getConnection();
+    
+//     try {
+//       // Check if the recommendation is approved
+//       const [rows] = await connection.query(
+//         'SELECT recommendation_status FROM recommendations WHERE lab_test_id = ?',
+//         [lab_test_id]
+//       );
+      
+//       if (rows.length === 0) {
+//         return res.status(404).json({
+//           success: false,
+//           message: 'Recommendation not found'
+//         });
+//       }
+      
+//       if (rows[0].recommendation_status !== 'approved') {
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Recommendation must be approved before sending'
+//         });
+//       }
+      
+//       // Update the recommendation status in the database
+//       const [result] = await connection.query(
+//         'UPDATE recommendations SET recommendation_status = "sent", updated_at = NOW() WHERE lab_test_id = ?',
+//         [lab_test_id]
+//       );
+      
+//       // Here you would typically have code to actually send the message to the patient
+//       // (e.g., email, SMS, notification, etc.)
+      
+//       return res.status(200).json({
+//         success: true,
+//         message: 'Recommendation sent to patient successfully',
+//         data: {
+//           lab_test_id,
+//           recommendation_status: 'sent',
+//           updated_at: new Date()
+//         }
+//       });
+//     } finally {
+//       // Release connection back to the pool
+//       connection.release();
+//     }
+//   } catch (error) {
+//     console.error('Error sending recommendation:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Failed to send recommendation',
+//       error: error.message
+//     });
+//   }
+// });
+
+
 module.exports = router;
