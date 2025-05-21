@@ -1,14 +1,12 @@
 // services/generateAndSaveRecommendation.js
 
+const db = require("../db.js");
 
-const db = require('../db.js');
+const { generateRecommendation } = require("./geminiService.js");
 
-const {generateRecommendation} = require('./geminiService.js');
+const { createRecommendationPrompt } = require("./recommendationPrompt.js");
 
-const {createRecommendationPrompt} = require('./recommendationPrompt.js');
-
-
-module.exports.generateAndSaveRecommendation = async function(lab_test_id) {
+module.exports.generateAndSaveRecommendation = async function (lab_test_id) {
   try {
     // Step 1: Get lab test data + patient info including doctor_id
     const [labData] = await db.query(
@@ -33,7 +31,22 @@ module.exports.generateAndSaveRecommendation = async function(lab_test_id) {
 
     const patientName = labData[0].patient_name;
     const doctorId = labData[0].doctor_id;
-    const prompt = await createRecommendationPrompt(patientName, labData);
+
+    // ✅ transform gender (id 9 or named 'gender') from 0/1 to Male/Female
+    const transformedLabData = labData.map((item) => {
+      if (
+        item.lab_item_name.toLowerCase() === "gender" &&
+        item.lab_item_value !== null
+      ) {
+        return {
+          ...item,
+          lab_item_value: String(item.lab_item_value) === "0" ? "Male" : "Female",
+          lab_item_status: null, // explicitly null since gender has no high/low
+        };
+      }
+      return item;
+    });
+    const prompt = await createRecommendationPrompt(patientName, transformedLabData);
 
     // Step 2: Generate recommendation
     const aiRecommendation = await generateRecommendation(prompt);
@@ -48,14 +61,12 @@ module.exports.generateAndSaveRecommendation = async function(lab_test_id) {
       [aiRecommendation, lab_test_id, doctorId]
     );
 
-    return { 
+    return {
       message: "Recommendation generated and saved successfully.",
-      doctorId: doctorId
+      doctorId: doctorId,
     };
-
   } catch (error) {
     console.error("Error generating recommendation:", error.message);
     throw error;
   }
-}
-
+};

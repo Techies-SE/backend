@@ -4,13 +4,15 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const db = require("../db");
 const bcrypt = require("bcrypt");
+const authenticateToken = require("../middlewear/auth");
 const router = express.Router();
 const upload = multer({ dest: "uploads/" }); // Temporary folder for uploads
 
 const saltRounds = 10; // the times the hashing algorithm will run to generate a  secure salt
 
 // fixed ***
-router.post("/patients", upload.single("csvFile"), async (req, res) => {
+// TODO: move inside the admin to upload patient csv file
+router.post("/patients", upload.single("csvFile"), authenticateToken,async (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded");
 
   const filePath = req.file.path;

@@ -1,6 +1,7 @@
 // services/recommendationPrompt.js
 
 module.exports.createRecommendationPrompt = async function(patientName, labItems) {
+  console.log("Lab Items passed to prompt:", labItems);
   const itemsDescription = labItems.map(item => {
     const statusText = item.lab_item_status === "unknown"
       ? "Status is unknown"

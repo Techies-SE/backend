@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const db = require('../db'); 
 const fs = require('fs');
+const authenticateToken = require('../middlewear/auth');
 
 // Multer config
 const storage = multer.diskStorage({
@@ -20,118 +21,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// PATCH route for department image upload
-router.patch('/image/upload/:id', upload.single('image'), async (req, res) => {
-  const departmentId = req.params.id;
-
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image file uploaded' });
-  }
-
-  const imagePath = `uploads/${req.file.filename}`;
-  const imageUrl = `http://localhost:3000/${imagePath}`;
-
-  try {
-    const [result] = await db.execute(
-      'UPDATE departments SET image = ? WHERE id = ?',
-      [imagePath, departmentId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Department not found' });
-    }
-
-    res.json({
-      message: 'Department image updated',
-      imagePath,
-      imageUrl,
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.delete('/image/delete/:id', async (req, res) => {
-  const departmentId = req.params.id;
-
-  try {
-    // Get current image path from DB
-    const [rows] = await db.execute('SELECT image FROM departments WHERE id = ?', [departmentId]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Department not found' });
-    }
-
-    const imagePath = rows[0].image;
-
-    // Delete file from disk if it exists
-    if (imagePath) {
-      const fullPath = path.join(__dirname, '..', imagePath);
-      fs.unlink(fullPath, (err) => {
-        if (err && err.code !== 'ENOENT') {
-          console.warn('Image file deletion failed:', err);
-        }
-      });
-    }
-
-    // Update DB: remove image reference
-    await db.execute(
-      'UPDATE departments SET image = NULL WHERE id = ?',
-      [departmentId]
-    );
-
-    res.json({ message: 'Department image removed successfully' });
-  } catch (err) {
-    console.error('Error removing department image:', err);
-    res.status(500).json({ error: 'Failed to remove image' });
-  }
-});
-
-
-// Create a department
-// router.post('/', async (req, res) => {
-//   const { name } = req.body;
-
-//   try {
-//     const [result] = await db.query('INSERT INTO departments (name) VALUES (?)', [name]);
-//     res.status(201).json({ id: result.insertId });
-//   } catch (err) {
-//     console.error('Error creating department:', err);
-//     res.status(500).json({ error: err.message });
-//   }
-// });
-router.post('/', upload.single('image'), async (req, res) => {
-  const { name, description } = req.body;
-  let imagePath = null;
-
-  if (req.file) {
-    imagePath = `uploads/${req.file.filename}`;
-  }
-
-  try {
-    const [result] = await db.query(
-      'INSERT INTO departments (name, description, image) VALUES (?, ?, ?)',
-      [name, description || null, imagePath]
-    );
-
-    res.status(201).json({
-      message: 'Department created successfully',
-      department: {
-        id: result.insertId,
-        name,
-        description: description || null,
-        image: imagePath ? `http://localhost:3000/${imagePath}` : null
-      }
-    });
-  } catch (err) {
-    console.error('Error creating department:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// TODO: move inside the patient to fetch the department list
 // Get all departments
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const [departments] = await db.query('SELECT * FROM departments');
     res.json(departments);
@@ -141,32 +33,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/doctor-counts', async (req, res) => {
-  // console.log('GET /departments/doctor-counts called');
-  try {
-    const [rows] = await db.query(`
-      SELECT 
-        d.id AS department_id,
-        d.name AS department_name,
-        d.description AS description,
-        COUNT(doc.id) AS doctor_count
-      FROM 
-        departments d
-      LEFT JOIN 
-        doctors doc ON d.id = doc.department_id
-      GROUP BY 
-        d.id, d.name, d.description
-      ORDER BY 
-        d.id;
-    `);
-
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    console.error('Error fetching doctor counts:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
-
+// TODO: move inside the patient to fetch the doctor list under the specific department
 // Get a department and its doctors by department ID
 router.get('/id=:id', async (req, res) => {
   const departmentId = req.params.id;
@@ -209,7 +76,135 @@ router.get('/id=:id', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+//TODO: move inside the admin to upload an image for a department
+// PATCH route for department image upload
+router.patch('/image/upload/:id', upload.single('image'), authenticateToken, async (req, res) => {
+  const departmentId = req.params.id;
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image file uploaded' });
+  }
+
+  const imagePath = `uploads/${req.file.filename}`;
+  const imageUrl = `http://localhost:3000/${imagePath}`;
+
+  try {
+    const [result] = await db.execute(
+      'UPDATE departments SET image = ? WHERE id = ?',
+      [imagePath, departmentId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+
+    res.json({
+      message: 'Department image updated',
+      imagePath,
+      imageUrl,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+//TODO: move inside the admin to delete an image for a department
+router.delete('/image/delete/:id', authenticateToken,async (req, res) => {
+  const departmentId = req.params.id;
+
+  try {
+    // Get current image path from DB
+    const [rows] = await db.execute('SELECT image FROM departments WHERE id = ?', [departmentId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+
+    const imagePath = rows[0].image;
+
+    // Delete file from disk if it exists
+    if (imagePath) {
+      const fullPath = path.join(__dirname, '..', imagePath);
+      fs.unlink(fullPath, (err) => {
+        if (err && err.code !== 'ENOENT') {
+          console.warn('Image file deletion failed:', err);
+        }
+      });
+    }
+
+    // Update DB: remove image reference
+    await db.execute(
+      'UPDATE departments SET image = NULL WHERE id = ?',
+      [departmentId]
+    );
+
+    res.json({ message: 'Department image removed successfully' });
+  } catch (err) {
+    console.error('Error removing department image:', err);
+    res.status(500).json({ error: 'Failed to remove image' });
+  }
+});
+
+//TODO: move inside the admin to submit a single department form
+router.post('/', upload.single('image'), authenticateToken, async (req, res) => {
+  const { name, description } = req.body;
+  let imagePath = null;
+
+  if (req.file) {
+    imagePath = `uploads/${req.file.filename}`;
+  }
+
+  try {
+    const [result] = await db.query(
+      'INSERT INTO departments (name, description, image) VALUES (?, ?, ?)',
+      [name, description || null, imagePath]
+    );
+
+    res.status(201).json({
+      message: 'Department created successfully',
+      department: {
+        id: result.insertId,
+        name,
+        description: description || null,
+        image: imagePath ? `http://localhost:3000/${imagePath}` : null
+      }
+    });
+  } catch (err) {
+    console.error('Error creating department:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// TODO: move inside the admin to view the list of departments and count of doctor under each department
+router.get('/doctor-counts', authenticateToken,async (req, res) => {
+  // console.log('GET /departments/doctor-counts called');
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        d.id AS department_id,
+        d.name AS department_name,
+        d.description AS description,
+        COUNT(doc.id) AS doctor_count
+      FROM 
+        departments d
+      LEFT JOIN 
+        doctors doc ON d.id = doc.department_id
+      GROUP BY 
+        d.id, d.name, d.description
+      ORDER BY 
+        d.id;
+    `);
+
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching doctor counts:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// TODO: move inside the admin to view the details of departments
+router.get('/:id', authenticateToken,async (req, res) => {
   const departmentId = req.params.id;
 
   const query = `
@@ -253,8 +248,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// TODO: move inside the admin to delete a single department from the table
 // DELETE department by ID (including image cleanup)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   const departmentId = req.params.id;
 
   try {

@@ -2,9 +2,11 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db"); // promise-based connection pool
+const authenticateToken = require("../middlewear/auth");
 
 // GET all doctors with their department
-router.get("/", async (req, res) => {
+// TODO: add inside the admin to get doctors with departments
+router.get("/", authenticateToken,async (req, res) => {
   try {
     const [results] = await pool.query(
       `SELECT
